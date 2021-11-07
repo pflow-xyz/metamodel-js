@@ -3,7 +3,7 @@ import { ModelDsl, Model } from "../src/metamodel";
 import { octothorpe } from "../src/examples";
 
 describe("Model", () => {
-    it("should load model from using DSL", () => {
+    it("should define nets using ModelDsl", () => {
         const m = new Model({ schema: "octoe" });
         m.loadDef(({ fn, cell, role }: ModelDsl) => {
             const r = role("default");
@@ -37,10 +37,21 @@ describe("Model", () => {
         expect(sim.state[0]).to.equal(0);
     });
 
+    it("should create models using petri-net syntax", () => {
+        const m = new Model({ schema: "octothorpe" }).toMetaModel();
+        const p0 = m.Place((p) => {
+            p.label = "foo";
+        });
+        const t0 = m.Transition((t) => {
+            t.label = "bar";
+        });
+        m.Arc(p0, t0);
+        // TODO: test guard
+        expect(Object.keys(m.places).length).to.equal(1);
+    });
+
     it("should be able to play tic-tac-toe", () => {
-        const m = new Model({ schema: "octothorpe" })
-            .loadDef(octothorpe)
-            .toMetaModel();
+        const m = new Model({ schema: "octothorpe" }).loadDef(octothorpe).toMetaModel();
 
         m.startSimulation();
 

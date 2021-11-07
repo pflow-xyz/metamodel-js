@@ -5,9 +5,11 @@ interface Position {
   y: number;
 }
 
-type Role = {
+type elementRef = {
   label: string;
 }
+
+type Role = elementRef;
 
 type RoleMap = {
   [key: string]: Role;
@@ -50,7 +52,7 @@ type TransitionMap = {
 }
 
 interface Node {
-  symbol: Place | Transition;
+  element: Place | Transition;
   tx(weight: number, target: Node): Node;
   guard(weight: number, target: Node): Node;
   isPlace(): boolean;
@@ -128,7 +130,7 @@ class Simulation {
     return [out, valid];
   }
 
-  guardsFail(oid: string, multiple: number): boolean {
+  guardFails(oid: string, multiple: number): boolean {
     let res = null;
     const t = this.transitions[oid];
     for (const place in t.guards) {
@@ -140,7 +142,7 @@ class Simulation {
     return false;
   }
 
-  transitionFails(oid: string, multiple: number) {
+  transitionFails(oid: string, multiple: number): boolean {
     const t = this.transitions[oid];
     const res = this.vectorAdd(this.state, t.delta, multiple);
     return !res[1];
@@ -152,7 +154,7 @@ class Simulation {
     }
     const t = this.transitions[oid];
 
-    if (this.guardsFail(oid, multiple || 1)) {
+    if (this.guardFails(oid, multiple || 1)) {
       return [this.state, false];
     }
 
@@ -164,18 +166,25 @@ class Simulation {
     if (ok) {
       this.history.push({ seq: this.history.length+1, action: oid, multiple,  state: out });
       this.state = out;
-      if (resolve) {
+      if (!!resolve) {
         resolve();
       }
     } else {
-      if (reject) {
+      if (!!reject) {
         reject();
       }
     }
   }
 }
 
-class MetaModel implements PetriNet {
+export interface ModelDef {
+  Place: (def: (p: Place) => void) => Place;
+  Transition: (def: (t: Transition) => void) => Transition;
+  Arc: (source: elementRef, target: elementRef, weight?: number) => void;
+  Guard: (source: elementRef, target: elementRef, weight?: number) => void;
+}
+
+class MetaModel implements PetriNet, ModelDef {
   schema: string;
   places: PlaceMap;
   transitions: TransitionMap;
@@ -185,6 +194,10 @@ class MetaModel implements PetriNet {
     this.schema = model.schema;
     this.places = model.places;
     this.transitions = model.transitions;
+  }
+
+  define(): ModelDef {
+    return this;
   }
 
   startSimulation(): Simulation {
@@ -204,7 +217,7 @@ class MetaModel implements PetriNet {
     assert(!!this.simulation, "NOT_RUNNING");
   }
 
-  getTokenCount(oid: string) {
+  getTokenCount(oid: string): number {
     if (oid in (this.places)) {
       if (this.isRunning()) {
         return this.simulation.state[this.places[oid].offset];
@@ -228,7 +241,7 @@ class MetaModel implements PetriNet {
   }
 
   canFire(oid: string, role?: string): boolean {
-    const t = this.getObject(oid) as Transition;
+    const t = this.transitions[oid] as Transition;
     if (role && t.role.label !== role) {
       return false;
     }
@@ -241,9 +254,9 @@ class MetaModel implements PetriNet {
     }
   }
 
-  guardsFail(oid: string, multiple?: number): boolean {
+  guardFails(oid: string, multiple?: number): boolean {
     this.assertRunning();
-    return this.simulation.guardsFail(oid, multiple || 1);
+    return this.simulation.guardFails(oid, multiple || 1);
   }
 
   transitionFails(oid: string, multiple?: number): boolean {
@@ -251,15 +264,7 @@ class MetaModel implements PetriNet {
     return this.simulation.transitionFails(oid, multiple || 1);
   }
 
-  getObject(oid: string): Place | Transition {
-    if (oid in this.transitions) {
-      return this.transitions[oid];
-    } else if (oid in this.places) {
-      return this.places[oid];
-    }
-  }
-
-  emptyVector() {
+  emptyVector(): Vector {
     return Object.keys(this.places).map(() => 0);
   }
 
@@ -279,36 +284,40 @@ class MetaModel implements PetriNet {
     return "txn"+x;
   }
 
-  addPlace(coords: Position): Place {
+  Place(def: (p: Place) => void): Place {
     const offset = Object.keys(this.places).length;
     const label = this.placeSeq();
-    this.places[label] = {
+    const p = {
       label: label,
       initial: 0,
       capacity: 0,
       offset,
-      position: {x: coords.x, y: coords.y},
+      position: {x: 0, y: 0},
     };
+    def(p);
+    this.places[p.label] = p;
 
     // extend delta vector size
     for (const oid in this.transitions) {
       this.transitions[oid].delta[offset] = 0;
     }
 
-    return this.places[label];
+    return p;
   }
 
-  addTransition(coords: Position): Transition {
+  Transition(def: (t: Transition) => void): Transition {
     const oid = this.transitionSeq();
-    this.transitions[oid] = {
+    const t = {
       offset: Object.keys(this.transitions).length,
       label: oid,
       role: { label: "default" },
       delta: this.emptyVector(),
-      position: {x: coords.x, y: coords.y},
+      position: {x: 0, y: 0},
       guards: {}
     };
-    return this.transitions[oid];
+    def(t);
+    this.transitions[t.label] = t;
+    return t;
   }
 
   validArc(source: string, target: string): boolean {
@@ -318,26 +327,45 @@ class MetaModel implements PetriNet {
     );
   }
 
-  addArc(begin: string, end: string) {
+  arc(source: elementRef, target: elementRef, weight?: number, guard?: boolean) {
     let t;
     let p;
-    let weight = 0;
+    let unit = 0;
+    const w = weight || 1;
 
-    if (begin in this.transitions) {
-      weight = 1;
-      t = this.transitions[begin];
-      p = this.places[end];
+    if (source.label in this.transitions) {
+      unit = 1;
+      t = this.transitions[source.label];
+      p = this.places[target.label];
     } else {
-      weight = -1;
-      t = this.transitions[end];
-      p = this.places[begin];
+      unit = -1;
+      t = this.transitions[target.label];
+      p = this.places[source.label];
     }
 
-    t.delta[p.offset] = weight;
+    if (!!guard) {
+      // FIXME define guard
+    } else {
+      t.delta[p.offset] = w*unit;
+    }
+  }
+
+  Arc(source: elementRef, target: elementRef, weight?: number) {
+    this.arc(source, target, weight || 1);
+  }
+
+  Guard(source: elementRef, target: elementRef, weight?: number) {
+    this.arc(source, target, weight || 1, true);
   }
 
   delTransition(oid: string) {
+    const t = this.transitions[oid];
     delete this.transitions[oid];
+    for (const txn in this.transitions) {
+      if (this.transitions[txn].offset > t.offset) {
+        this.transitions[txn].offset = this.transitions[txn].offset - 1
+      }
+    }
   }
 
   delPlace(oid: string) {
@@ -366,14 +394,14 @@ class MetaModel implements PetriNet {
     delete this.transitions[t].guards[p];
   }
 
-  toggleInhibitor(arc: { source: string; target: string}) {
+  toggleInhibitor(arc: { source: string; target: string}): boolean {
     if (arc.source in this.transitions) {
       return false;
     }
 
     const label = arc.source;
-    const p = this.getObject(arc.source) as Place;
-    const t = this.getObject(arc.target) as Transition;
+    const p = this.places[arc.source] as Place;
+    const t = this.transitions[arc.target] as Transition;
 
     if (t.delta[p.offset] !== 0) {
       const delta = this.emptyVector();
@@ -388,7 +416,7 @@ class MetaModel implements PetriNet {
   }
 
   // REVIEW: should we accept oid instead of transition as arg?
-  addGuardToken(t: Transition, pid: string, offset: number, delta: number) {
+  addGuardToken(t: Transition, pid: string, offset: number, delta: number): boolean {
     let v = t.guards[pid]["delta"][offset];
 
     if (v > 0) {
@@ -406,17 +434,17 @@ class MetaModel implements PetriNet {
     return true;
   }
 
-  addArcToken(arc: { source: string; target: string }, delta: number) {
+  addArcToken(arc: { source: string; target: string }, delta: number): boolean {
     let t;
     let p;
     let pid;
     if (arc.source in this.transitions) {
-      t = this.getObject(arc.source) as Transition;
-      p = this.getObject(arc.target) as Place;
+      t = this.transitions[arc.source];
+      p = this.places[arc.target];
       pid = arc.target;
     } else {
-      t = this.getObject(arc.target) as Transition;
-      p = this.getObject(arc.source) as Place;
+      t = this.transitions[arc.target];
+      p = this.places[arc.source];
       pid = arc.source;
     }
 
@@ -443,13 +471,12 @@ class MetaModel implements PetriNet {
 
 }
 
-
 interface Graph {
   arcs: Arc[];
 }
 
 class Element implements Node {
-  symbol: Place | Transition;
+  element: Place | Transition;
   private graph: Graph;
 
   constructor(net: Graph) {
@@ -457,28 +484,28 @@ class Element implements Node {
   }
 
   isPlace(): boolean {
-    const initial = (this.symbol as Place).initial;
+    const initial = (this.element as Place).initial;
     return initial === 0 || initial > 0;
   }
 
   isTransition(): boolean {
-    return !!(this.symbol as Transition).delta;
+    return !!(this.element as Transition).delta;
   }
 
   get place(): Place {
-    return this.symbol as Place;
+    return this.element as Place;
   }
 
   set place(p: Place) {
-    this.symbol = p;
+    this.element = p;
   }
 
   get transition(): Transition {
-    return this.symbol as Transition;
+    return this.element as Transition;
   }
 
   set transition(t: Transition) {
-    this.symbol = t;
+    this.element = t;
   }
 
   guard(weight: number, target: Node): Node {
@@ -551,7 +578,7 @@ class StateMachine implements PetriNet {
     return out;
   }
 
-  add(state: Vector, delta: Vector, multiplier: number, capacity: Vector) {
+  add(state: Vector, delta: Vector, multiplier: number, capacity: Vector): [Error, Vector] {
     let err = null;
     const out = this.emptyVector();
     for (const index in state) {
@@ -568,7 +595,7 @@ class StateMachine implements PetriNet {
     return [err, out];
   }
 
-  transform(inputState: Vector, transaction: string, multiplier: number) {
+  transform(inputState: Vector, transaction: string, multiplier: number): [ Error, Vector, Role] {
     const [delta, role, guards] = this.action(transaction);
     for ( const label in guards) {
       const guard = guards[label];
@@ -594,7 +621,7 @@ class StateMachine implements PetriNet {
     }
   }
 
-  offset(placeLabel: string) {
+  offset(placeLabel: string): number {
     const pl = this.places[placeLabel];
     if (! pl) {
       throw new Error(errMsg.InvalidPlace);
@@ -602,7 +629,7 @@ class StateMachine implements PetriNet {
     return pl.offset;
   }
 
-  actionId(transitionLabel: string) {
+  actionId(transitionLabel: string): number {
     const act = this.transitions[transitionLabel];
     if (! act) {
       throw new Error(errMsg.InvalidAction);
@@ -667,7 +694,7 @@ interface ModelArgs {
   model?: { places: PlaceMap; transitions: TransitionMap };
 }
 
-export class Model extends Dsl implements ModelDsl {
+export class Model extends Dsl {
 
   constructor({schema, model}: ModelArgs) {
     super();
