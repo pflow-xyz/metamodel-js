@@ -27,6 +27,7 @@ import assert from "assert";
 interface Position {
   x: number;
   y: number;
+  z?: number;
 }
 
 type elementRef = {
@@ -387,7 +388,7 @@ class MetaModel implements PetriNet, ModelDef {
     delete this.transitions[oid];
     for (const txn in this.transitions) {
       if (this.transitions[txn].offset > t.offset) {
-        this.transitions[txn].offset = this.transitions[txn].offset - 1
+        this.transitions[txn].offset = this.transitions[txn].offset - 1;
       }
     }
   }
