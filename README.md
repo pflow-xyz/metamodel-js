@@ -9,15 +9,18 @@ TODO: add CI jobs
 
 
 #### Installation
-```
-npm install @pflow-dev/metamodel-js
-```
+
+Use this file in your project https://github.com/pFlow-dev/metamodel-js/blob/master/src/metamodel.ts
+
+or
+
+use `./build.sh` script for browserified version
+
 
 #### Usage 
+TODO: add replit links
 
-```
-FIXME - show simple state machine examples
-```
+
 ### Applications
 
 * https://pflow.dev/editor - Interactive graphical editor that can export models compatible with this library.
