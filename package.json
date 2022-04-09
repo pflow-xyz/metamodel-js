@@ -1,12 +1,12 @@
 {
-    "name": "@pflow-dev/metamodel",
+    "name": "@pflow-dev/metamodel-js",
     "version": "0.1.0",
     "main": "./dist/index.js",
     "types": "./dist/index.ts",
     "description": "",
     "repository": {
         "type": "git",
-        "url": "https://github.com/pflow-dev/metamodel"
+        "url": "https://github.com/pflow-dev/metamodel-js"
     },
     "author": "myork@stackdump.com",
     "license": "MIT",

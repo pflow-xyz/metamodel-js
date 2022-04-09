@@ -10,7 +10,7 @@ TODO: add CI jobs
 
 #### Installation
 ```
-npm install @pflow-dev/metamodel
+npm install @pflow-dev/metamodel-js
 ```
 
 #### Usage 
@@ -20,8 +20,7 @@ FIXME - show simple state machine examples
 ```
 ### Applications
 
-* https://pflow.dev - Interactive graphical editor that can export models compatible with this library.
-* TODO: link to npm lib
+* https://pflow.dev/editor - Interactive graphical editor that can export models compatible with this library.
  
 ###  Theory
 
