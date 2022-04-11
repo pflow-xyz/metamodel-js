@@ -1,16 +1,6 @@
-import { player, move } from "./constants";
 import {Fn, Cell, Role, PlaceNode, RoleDef} from "../metamodel";
 
-const X = "X";
-const O = "O";
-
-interface Player {
-  turn: PlaceNode;
-  role: RoleDef;
-  next: string;
-}
-
-export function octothorpe(fn: Fn, cell: Cell, role: Role): void {
+export function tictactoe(fn: Fn, cell: Cell, role: Role): void {
 
   function row(n: number) {
     return [
@@ -26,7 +16,15 @@ export function octothorpe(fn: Fn, cell: Cell, role: Role): void {
     row(2)
   ];
 
+  interface Player {
+    turn: PlaceNode;
+    role: RoleDef;
+    next: string;
+  }
+
   const players = new Map<string, Player>();
+  const X = "X";
+  const O = "O";
 
   players.set(X, {
     turn: cell(X, 1, 1, { x: 0, y: 0, z: 0 }), // track turns, X goes first
@@ -35,7 +33,7 @@ export function octothorpe(fn: Fn, cell: Cell, role: Role): void {
   });
 
   players.set(O, {
-    turn: cell(O, 0, 1, { x: 0, y: 0, z: 0 }), // track turns, moves second
+    turn: cell(O, 0, 1, { x: 0, y: 0, z: 0 }), // track turns, O moves second
     role: role(O), // player O can only mark O's
     next: X
   });
@@ -50,4 +48,5 @@ export function octothorpe(fn: Fn, cell: Cell, role: Role): void {
       }
     }
   }
+
 }

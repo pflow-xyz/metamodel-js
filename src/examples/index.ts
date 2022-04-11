@@ -1,2 +1,1 @@
-export { octoe } from "./octoe";
-export { octothorpe } from "./octothorpe";
+export { tictactoe } from "./tictactoe";

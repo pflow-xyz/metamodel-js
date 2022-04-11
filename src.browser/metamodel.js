@@ -127,6 +127,7 @@ function domodel(schema, declaration) {
 		for (const transition of Object.values(def.transitions)) {
 			transition.delta = emptyVector(); // right size all deltas
 		}
+		let ok = true;
 		for (const arc of Object.values(def.arcs) ) {
 			if (arc.inhibit) {
 				const g = {
@@ -135,14 +136,15 @@ function domodel(schema, declaration) {
 				};
 				g.delta[arc.source.place.offset] = 0 - arc.weight;
 				arc.target.transition.guards[arc.source.place.label] = g;
-			}
-		else
-			if (arc.source.transition) {
+			} else if (arc.source.transition) {
 				arc.source.transition.delta[arc.target.place.offset] = arc.weight;
+			} else if (arc.source.place) {
+				arc.target.transition.delta[arc.source.place.offset] = 0 - arc.weight;
+			} else {
+				ok = false;
 			}
-		else
-			arc.target.transition.delta[arc.source.place.offset] = 0 - arc.weight;
 		}
+		return ok;
 	}
 
 	function vectorAdd(state, delta, multiple) {
@@ -199,7 +201,9 @@ function domodel(schema, declaration) {
 
 	if (declaration) {
 		declaration(fn, cell, role);
-		index();
+		if (!index()) {
+			throw new Error("invalid declaration");
+		}
 	}
 
 	return {
@@ -207,7 +211,6 @@ function domodel(schema, declaration) {
 		def,
 		index,
 		guardFails,
-		placeCount,
 		emptyVector,
 		initialVector,
 		capacityVector,

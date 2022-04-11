@@ -1,10 +1,10 @@
 import { expect } from "chai";
 import { domodel} from "../src/metamodel";
-import { octothorpe } from "../src/examples";
+import { tictactoe } from "../src/examples";
 
-describe("Model", () => {
+describe("metamodel", () => {
     it("should be able to play tic-tac-toe", () => {
-        const m = domodel("octothorpe", octothorpe);
+        const m = domodel("octothorpe", tictactoe);
         const state = m.initialVector();
         expect(m.emptyVector()).to.deep.equal( [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
         expect(state).to.deep.equal( [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0]);
@@ -15,5 +15,6 @@ describe("Model", () => {
         m.fire(state, "O01", 1);
         expect(state).to.deep.equal( [1, 0, 1, 1, 0, 1, 1, 1, 1, 1, 0]);
     });
+    // TODO: test inhibitor arcs
 });
 

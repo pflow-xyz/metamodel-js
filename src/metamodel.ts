@@ -90,6 +90,12 @@ export interface PetriNet {
 	arcs: Array<Arc>;
 }
 
+export interface Result {
+	out: Vector;
+	ok: boolean;
+	role: string;
+}
+
 export interface Model {
 	dsl: { fn: Fn; cell: Cell; role: Role };
 	def: PetriNet;
@@ -98,8 +104,8 @@ export interface Model {
 	emptyVector: () => Vector;
 	initialVector: () => Vector;
 	capacityVector: () => Vector;
-	testFire: (state: Vector, action: string, multiple: number) => { out: Vector; ok: boolean; role: string};
-	fire: (state: Vector, action: string, multiple: number, resolve?: () => void, reject?: () => void) =>  void;
+	testFire: (state: Vector, action: string, multiple: number) => Result;
+	fire: (state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void) =>  Result;
 }
 
 // load a model using internal js DSL
@@ -199,10 +205,11 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 		return v;
 	}
 
-	function index() {
+	function index(): boolean {
 		for (const label in def.transitions) {
 			def.transitions.get(label).delta = emptyVector(); // right size all deltas
 		}
+		let ok = true;
 		for (const arc of Object.values(arcs) ) {
 			if (arc.inhibit && arc.source.place && arc.target.transition) {
 				const g = {
@@ -215,8 +222,11 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 				arc.source.transition.delta[arc.target.place.offset] = arc.weight;
 			} else if (arc.target.transition && arc.source.place) {
 				arc.target.transition.delta[arc.source.place.offset] = 0 - arc.weight;
+			} else {
+				ok = false;
 			}
 		}
+		return ok;
 	}
 
 	function vectorAdd(state: Vector, delta: Vector, multiple: number): { out: Vector; ok: boolean } {
@@ -244,12 +254,12 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 				}
 			}
 		} else {
-			throw("action not found");
+			throw new Error("action not found");
 		}
 		return false; // inhibitor inactive
 	}
 
-	function testFire(state: Vector, action: string, multiple: number): { out: Vector; ok: boolean; role: string } {
+	function testFire(state: Vector, action: string, multiple: number): Result {
 		const t = def.transitions.get(action);
 		if (!t || guardFails(state, action, multiple) ) {
 			return { out: [], ok: false, role: t?.role?.label || "unknown" };
@@ -258,7 +268,7 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 		return { out: res.out, ok: res.ok, role: t.role.label };
 	}
 
-	function fire(state: Vector, action: string, multiple: number, resolve: () => void, reject: () => void) {
+	function fire(state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void): Result {
 		const res = testFire(state, action, multiple);
 		if (res.ok) {
 			for (const i in res.out) {
@@ -266,16 +276,18 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 			}
 		}
 		if (resolve) {
-			resolve();
+			resolve(res);
 		} else if (reject) {
-			reject();
+			reject(res);
 		}
 		return res;
 	}
 
 	if (declaration) {
 		declaration(fn, cell, role);
-		index();
+		if (!index()) {
+			throw new Error("invalid declaration");
+		}
 	}
 
 	return {
