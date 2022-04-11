@@ -274,9 +274,9 @@ export function domodel(schema: string, declaration?: Declaration): Model {
 			for (const i in res.out) {
 				state[i] = res.out[i];
 			}
-		}
-		if (resolve) {
-			resolve(res);
+			if (resolve) {
+				resolve(res);
+			}
 		} else if (reject) {
 			reject(res);
 		}

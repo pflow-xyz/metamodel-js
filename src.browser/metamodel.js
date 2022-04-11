@@ -190,9 +190,9 @@ function domodel(schema, declaration) {
 			for ([i, v] of Object.entries(res.out)) {
 				state[i] = v;
 			}
-		}
-		if (resolve) {
-			resolve(res);
+			if (resolve) {
+				resolve(res);
+			}
 		} else if (reject) {
 			reject(res);
 		}
