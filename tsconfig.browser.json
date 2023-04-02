@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
+    "skipLibCheck": true,
     "baseUrl": ".",
-    "outDir": "./dist.browser",
+    "outDir": "./dist",
     "target": "es5",
     "module": "es2015",
     "allowSyntheticDefaultImports": true,

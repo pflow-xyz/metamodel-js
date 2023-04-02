@@ -1,9 +1,11 @@
 {
   "name": "@pflow-dev/metamodel-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "./dist/index.js",
-  "types": "./dist/index.ts",
   "description": "",
+  "files": [
+    "dist"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/pflow-dev/metamodel-js"
@@ -11,7 +13,7 @@
   "author": "myork@stackdump.com",
   "license": "MIT",
   "scripts": {
-    "build": "tsc && tsc -p tsconfig.browser.json --downlevelIteration",
+    "build": "tsc -p tsconfig.browser.json --downlevelIteration",
     "lint": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
     "test": "jest --forceExit --coverage --verbose --detectOpenHandles"
   },
@@ -29,6 +31,6 @@
     "eslint": "^6.8.0",
     "jest": "^26.1.0",
     "ts-jest": "^26.1.1",
-    "typescript": "^3.9.6"
+    "typescript": "^4.9.4"
   }
 }
