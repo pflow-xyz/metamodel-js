@@ -123,6 +123,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         def.transitions.set(label, transition);
 
         const tx = (weight: number, target: PlaceNode): void => {
+            if (def.type === ModelType.elementary && weight !== 1) {
+                throw new Error(`elementary models only support weight 1, got ${weight}`);
+            }
             arcs.push({
                 source: {transition: transition},
                 target: {place: target.place},
@@ -147,6 +150,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         def.places.set(label, place);
 
         function tx(weight: number, target: TxNode): void {
+            if (def.type === ModelType.elementary && weight !== 1) {
+                throw new Error(`elementary models only support weight 1, got ${weight}`);
+            }
             arcs.push({
                 source: {place: place},
                 target: {transition: target.transition},
@@ -155,6 +161,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         }
 
         function guard(weight: number, target: TxNode) {
+            if (def.type === ModelType.elementary && weight !== 1) {
+                throw new Error(`elementary models only support weight 1, got ${weight}`);
+            }
             arcs.push({
                 source: {place},
                 target: {transition: target.transition},
@@ -184,8 +193,19 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     function initialVector(): Vector {
         const v: Vector = [];
-        for (const [, p] of def.places) {
+        let initialCount = 0;
+        def.places.forEach((p) => {
+            if (def.type === ModelType.elementary && p.initial > 1) {
+                throw new Error("Initial values must be 0 or 1");
+            }
+            if (p.initial > 0) {
+                initialCount++;
+            }
             v[p.offset] = p.initial;
+        });
+
+        if (def.type === ModelType.elementary && initialCount > 1) {
+            throw new Error("Elementary models can only have one initial token");
         }
         return v;
     }
@@ -193,6 +213,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     function capacityVector(): Vector {
         const v: Vector = [];
         for (const [, p] of def.places) {
+            if (def.type === ModelType.elementary && p.capacity > 1) {
+                throw new Error("Elementary models can only have arcs of weight 1");
+            }
             v[p.offset] = p.capacity;
         }
         return v;
@@ -204,6 +227,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         }
         let ok = true;
         for (const arc of Object.values(arcs)) {
+            if (def.type === ModelType.elementary && (arc.weight > 1 || arc.weight < -1)) {
+                throw new Error("Elementary models can only have arcs of weight 1");
+            }
             if (arc.inhibit && arc.source.place && arc.target.transition) {
                 const g = {
                     label: arc.source.place.label,
@@ -262,7 +288,44 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     }
 
     function fire(state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void): Result {
-        const res = testFire(state, action, multiple);
+        let res = testFire(state, action, multiple);
+        switch (def.type) {
+            case ModelType.elementary:
+                if (!res.ok) {
+                    break;
+                }
+                let elementaryOutputs = 0;
+                for (const i in res.out) {
+                    if (res.out[i] > 1) {
+                        res = {...res, ok: false};
+                    }
+                    if (res.out[i] > 0) {
+                        elementaryOutputs++;
+                    }
+                }
+                if (elementaryOutputs > 1) {
+                    res = {...res, ok: false};
+                }
+                break;
+            case ModelType.workflow:
+                if (!res.ok) {
+                    break;
+                }
+                let wfOutputs = 0;
+                const wfOut = emptyVector();
+                for (const i in res.out) {
+                    if (res.out[i] > 0) {
+                        wfOutputs++;
+                        wfOut[i] = res.out[i];
+                    } // NOTE: don't care about negative values
+                }
+                if (wfOutputs > 1) { // only one output allowed
+                    res = {...res, ok: false};
+                } else {
+                    res = {...res, out: wfOut, ok: true};
+                }
+                break;
+        }
         if (res.ok) {
             for (const i in res.out) {
                 state[i] = res.out[i];
@@ -270,12 +333,6 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             if (resolve) {
                 resolve(res);
             }
-        }
-        if (def.type === ModelType.elementary) {
-            // allow for sub-conditionals
-        }
-        if (def.type === ModelType.workflow) {
-            // allow for sub-conditionals
         }
         if (!res.ok && reject) {
             reject(res);

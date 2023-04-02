@@ -1,4 +1,4 @@
-import {tictactoe} from "../src/examples";
+import {tictactoe} from "./examples";
 import {Stream} from "../src/stream";
 import {newModel} from "../src";
 
@@ -12,7 +12,7 @@ interface MyEvent {
 
 describe("stream", () => {
     it("should be able to play tic-tac-toe", () => {
-        const models = [newModel({ schema: "game", declaration: tictactoe })];
+        const models = [newModel({schema: "game", declaration: tictactoe})];
         const s = new Stream<MyEvent>({models});
         const {on, onFail} = s.dispatcher;
 

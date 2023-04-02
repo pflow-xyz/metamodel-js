@@ -25,196 +25,197 @@
 // load a model using internal js DSL
 function newModel(schema, declaration) {
 
-	const def = {
-		schema: schema,
-		roles: {},
-		places: {},
-		transitions: {},
-		arcs: [],
-	};
+    const def = {
+        schema: schema,
+        roles: {},
+        places: {},
+        transitions: {},
+        arcs: [],
+    };
 
-	function assert(flag, msg) {
-		if (! flag) {
-			throw new Error(msg);
-		}
-	}
+    function assert(flag, msg) {
+        if (!flag) {
+            throw new Error(msg);
+        }
+    }
 
-	function fn(label, role, position) {
-		const transition =  { label, role, position, guards: {}, delta: {} };
-		def.transitions[label] = transition;
-		return {
-			transition: transition,
-			tx: (weight, target) => {
-				assert(target, "target is null" );
-				assert(target.place, "target node must be a place");
-				def.arcs.push({
-					source: { transition: transition },
-					target,
-					weight,
-					inhibit: false
-				});
-			}
-		};
-	}
+    function fn(label, role, position) {
+        const transition = {label, role, position, guards: {}, delta: {}};
+        def.transitions[label] = transition;
+        return {
+            transition: transition,
+            tx: (weight, target) => {
+                assert(target, "target is null");
+                assert(target.place, "target node must be a place");
+                def.arcs.push({
+                    source: {transition: transition},
+                    target,
+                    weight,
+                    inhibit: false
+                });
+            }
+        };
+    }
 
-	let placeCount = 0;
+    let placeCount = 0;
 
-	function cell(label, initial, capacity, position) {
-		const place = {
-			label: label,
-			initial: initial || 0,
-			capacity: capacity || 0,
-			position: position || {},
-			offset: placeCount
-		};
-		placeCount = placeCount + 1; // NOTE: js arrays begin with index 0
-		def.places[label] = place;
+    function cell(label, initial, capacity, position) {
+        const place = {
+            label: label,
+            initial: initial || 0,
+            capacity: capacity || 0,
+            position: position || {},
+            offset: placeCount
+        };
+        placeCount = placeCount + 1; // NOTE: js arrays begin with index 0
+        def.places[label] = place;
 
-		function tx(weight, target) {
-			def.arcs.push({
-				source: { place: place },
-				target: target,
-				weight: weight || 1,
-				inhibit: false
-			});
-			assert(target.transition, "target node must be a transition");
-		}
+        function tx(weight, target) {
+            def.arcs.push({
+                source: {place: place},
+                target: target,
+                weight: weight || 1,
+                inhibit: false
+            });
+            assert(target.transition, "target node must be a transition");
+        }
 
-		function guard(weight, target) {
-			def.arcs.push({
-				source: { place },
-				target: target,
-				weight: weight,
-				inhibit: true
-			});
-			assert(target.transition, "target node must be a transition");
-		}
-		return { place, tx, guard };
-	}
+        function guard(weight, target) {
+            def.arcs.push({
+                source: {place},
+                target: target,
+                weight: weight,
+                inhibit: true
+            });
+            assert(target.transition, "target node must be a transition");
+        }
 
-	function role(label) {
-		if (!def.roles[label]) {
-			def.roles[label] = { label };
-		}
-		return def.roles[label];
-	}
+        return {place, tx, guard};
+    }
 
-	function emptyVector() {
-		const v = {};
-		for (const p of Object.values(def.places)) {
-			v[p.offset] = 0;
-		}
-		return v;
-	}
+    function role(label) {
+        if (!def.roles[label]) {
+            def.roles[label] = {label};
+        }
+        return def.roles[label];
+    }
 
-	function initialVector() {
-		const v = {};
-		for (const p of Object.values(def.places)) {
-			v[p.offset] = p.initial;
-		}
-		return v;
-	}
+    function emptyVector() {
+        const v = {};
+        for (const p of Object.values(def.places)) {
+            v[p.offset] = 0;
+        }
+        return v;
+    }
 
-	function capacityVector() {
-		const v = {};
-		for (const p of Object.values(def.places)) {
-			v[p.offset] = p.capacity;
-		}
-		return v;
-	}
+    function initialVector() {
+        const v = {};
+        for (const p of Object.values(def.places)) {
+            v[p.offset] = p.initial;
+        }
+        return v;
+    }
 
-	function index() {
-		for (const transition of Object.values(def.transitions)) {
-			transition.delta = emptyVector(); // right size all deltas
-		}
-		let ok = true;
-		for (const arc of Object.values(def.arcs) ) {
-			if (arc.inhibit) {
-				const g = {
-					label: arc.source.place.label,
-					delta: emptyVector(),
-				};
-				g.delta[arc.source.place.offset] = 0 - arc.weight;
-				arc.target.transition.guards[arc.source.place.label] = g;
-			} else if (arc.source.transition) {
-				arc.source.transition.delta[arc.target.place.offset] = arc.weight;
-			} else if (arc.source.place) {
-				arc.target.transition.delta[arc.source.place.offset] = 0 - arc.weight;
-			} else {
-				ok = false;
-			}
-		}
-		return ok;
-	}
+    function capacityVector() {
+        const v = {};
+        for (const p of Object.values(def.places)) {
+            v[p.offset] = p.capacity;
+        }
+        return v;
+    }
 
-	function vectorAdd(state, delta, multiple) {
-		const cap = capacityVector();
-		const out = {};
-		let ok = true;
-		for (const i in state) {
-			out[i] = state[i] + delta[i] * multiple;
-			if (out[i] < 0) {
-				ok = false; // underflow: contains negative
-			} else if (cap[i] > 0 && cap[i] - out[i] < 0 ) {
-				ok = false; // overflow: exceeds capacity
-			}
-		}
-		return { out, ok };
-	}
+    function index() {
+        for (const transition of Object.values(def.transitions)) {
+            transition.delta = emptyVector(); // right size all deltas
+        }
+        let ok = true;
+        for (const arc of Object.values(def.arcs)) {
+            if (arc.inhibit) {
+                const g = {
+                    label: arc.source.place.label,
+                    delta: emptyVector(),
+                };
+                g.delta[arc.source.place.offset] = 0 - arc.weight;
+                arc.target.transition.guards[arc.source.place.label] = g;
+            } else if (arc.source.transition) {
+                arc.source.transition.delta[arc.target.place.offset] = arc.weight;
+            } else if (arc.source.place) {
+                arc.target.transition.delta[arc.source.place.offset] = 0 - arc.weight;
+            } else {
+                ok = false;
+            }
+        }
+        return ok;
+    }
 
-	function guardFails(state, action, multiple) {
-		assert(action, "action is nil");
-		const t = def.transitions[action];
-		assert(t, "action not found: " + action );
-		for (const guard of Object.values(t.guards)) {
-			const res = vectorAdd(state, guard.delta, multiple);
-			if (res.ok) {
-				return true; // inhibitor active
-			}
-		}
-		return false; // inhibitor inactive
-	}
+    function vectorAdd(state, delta, multiple) {
+        const cap = capacityVector();
+        const out = {};
+        let ok = true;
+        for (const i in state) {
+            out[i] = state[i] + delta[i] * multiple;
+            if (out[i] < 0) {
+                ok = false; // underflow: contains negative
+            } else if (cap[i] > 0 && cap[i] - out[i] < 0) {
+                ok = false; // overflow: exceeds capacity
+            }
+        }
+        return {out, ok};
+    }
 
-	function testFire(state, action, multiple) {
-		const t = def.transitions[action];
-		if (guardFails(state, action, multiple) ) {
-			return { out: null, ok: false, role: t.role.label };
-		}
-		const res = vectorAdd(state, t.delta, multiple);
-		return { out: res.out, ok: res.ok, role: t.role.label };
-	}
+    function guardFails(state, action, multiple) {
+        assert(action, "action is nil");
+        const t = def.transitions[action];
+        assert(t, "action not found: " + action);
+        for (const guard of Object.values(t.guards)) {
+            const res = vectorAdd(state, guard.delta, multiple);
+            if (res.ok) {
+                return true; // inhibitor active
+            }
+        }
+        return false; // inhibitor inactive
+    }
 
-	function fire(state, action, multiple, resolve, reject) {
-		const res = testFire(state, action, multiple);
-		if (res.ok) {
-			for ([i, v] of Object.entries(res.out)) {
-				state[i] = v;
-			}
-			if (resolve) {
-				resolve(res);
-			}
-		} else if (reject) {
-			reject(res);
-		}
-		return res;
-	}
+    function testFire(state, action, multiple) {
+        const t = def.transitions[action];
+        if (guardFails(state, action, multiple)) {
+            return {out: null, ok: false, role: t.role.label};
+        }
+        const res = vectorAdd(state, t.delta, multiple);
+        return {out: res.out, ok: res.ok, role: t.role.label};
+    }
 
-	if (declaration) {
-		declaration(fn, cell, role);
-		if (!index()) {
-			throw new Error("invalid declaration");
-		}
-	}
+    function fire(state, action, multiple, resolve, reject) {
+        const res = testFire(state, action, multiple);
+        if (res.ok) {
+            for ([i, v] of Object.entries(res.out)) {
+                state[i] = v;
+            }
+            if (resolve) {
+                resolve(res);
+            }
+        } else if (reject) {
+            reject(res);
+        }
+        return res;
+    }
 
-	return {
-		dsl: { fn, cell, role },
-		def,
-		index,
-		guardFails,
-		emptyVector,
-		initialVector,
-		capacityVector,
-		testFire,
-		fire,
-	};
+    if (declaration) {
+        declaration(fn, cell, role);
+        if (!index()) {
+            throw new Error("invalid declaration");
+        }
+    }
+
+    return {
+        dsl: {fn, cell, role},
+        def,
+        index,
+        guardFails,
+        emptyVector,
+        initialVector,
+        capacityVector,
+        testFire,
+        fire,
+    };
 }

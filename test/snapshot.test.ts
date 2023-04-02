@@ -1,5 +1,5 @@
 import {newModel, snapshot} from "../src";
-import {tictactoe} from "../src/examples";
+import {tictactoe} from "./examples";
 
 it("should render a snapshot", () => {
     const m = newModel({schema: "game", declaration: tictactoe});

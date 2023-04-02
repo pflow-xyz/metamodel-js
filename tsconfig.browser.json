@@ -6,7 +6,11 @@
     "module": "es2015",
     "allowSyntheticDefaultImports": true,
     "moduleResolution": "node",
-    "lib": ["es2016", "dom", "es5"]
+    "lib": [
+      "es2016",
+      "dom",
+      "es5"
+    ]
   },
   "include": [
     "./src/**/*"
