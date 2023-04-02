@@ -4,7 +4,7 @@ import {newModel} from "../src";
 
 describe("metamodel", () => {
     it("should be able to play tic-tac-toe", () => {
-        const m = newModel("game", tictactoe);
+        const m = newModel({schema: "game", declaration: tictactoe});
         expect(m.def.type).to.equal("petriNet");
         const state = m.initialVector();
         expect(m.emptyVector()).to.deep.equal([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);

@@ -12,7 +12,7 @@ interface MyEvent {
 
 describe("stream", () => {
     it("should be able to play tic-tac-toe", () => {
-        const models = [newModel("game", tictactoe)];
+        const models = [newModel({ schema: "game", declaration: tictactoe })];
         const s = new Stream<MyEvent>({models});
         const {on, onFail} = s.dispatcher;
 
