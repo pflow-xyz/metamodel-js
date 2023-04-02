@@ -1,7 +1,7 @@
 /*
  MIT License
 
- Copyright (c) 2022 stackdump.com LLC
+ Copyright (c) 2023 stackdump.com LLC
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -23,7 +23,7 @@
 */
 
 // load a model using internal js DSL
-function domodel(schema, declaration) {
+function newModel(schema, declaration) {
 
 	const def = {
 		schema: schema,

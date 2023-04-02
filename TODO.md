@@ -1,19 +1,22 @@
+Metamodel-js
+------------
+
+NPM package 
+
+User experience - Super lightweight Visual elements - using models for documentation only & likely no live edits.
+
+provide a framework for generating and
+signing streams of data transformations driven by models
+
 WIP
 ---
+- [ ] refactor to use forEach instead of for loops consistently
 
-Generate a JS package that can be used in 'headless' mode in browser AND/OR node.
+ICEBOX
+------
+- [ ] build out to target the browser
 
-- [ ] test using lib from another package
-- [x] test using in a browser
-- [ ] publish NPM package
-
-- [ ] test MetaModel API - some peripheral helps may not have coverage
-
-BACKLOG
--------
-
-- [ ] try out curried types for state machine
-
-SM(n) => SM(n+1)  / where SM is an Interface that can yield itself
- with a transition map of live transitions.
-
+DONE
+----
+- [x] support SVG generation & output
+- [x] support Stream of multiple models
