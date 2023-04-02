@@ -295,35 +295,31 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                     break;
                 }
                 let elementaryOutputs = 0;
+                let failsHardCap = false;
                 for (const i in res.out) {
                     if (res.out[i] > 1) {
-                        res = {...res, ok: false};
+                        failsHardCap = true;
                     }
                     if (res.out[i] > 0) {
                         elementaryOutputs++;
                     }
                 }
-                if (elementaryOutputs > 1) {
-                    res = {...res, ok: false};
-                }
+                res = {...res, ok: !failsHardCap && elementaryOutputs < 2 };
                 break;
             case ModelType.workflow:
-                if (!res.ok) {
-                    break;
-                }
                 let wfOutputs = 0;
+                let failsWfCap = false;
                 const wfOut = emptyVector();
                 for (const i in res.out) {
+                    if (res.out[i] > 1) {
+                        failsWfCap = true;
+                    }
                     if (res.out[i] > 0) {
                         wfOutputs++;
                         wfOut[i] = res.out[i];
-                    } // NOTE: don't care about negative values
+                    } // NOTE: ignore negative values
                 }
-                if (wfOutputs > 1) { // only one output allowed
-                    res = {...res, ok: false};
-                } else {
-                    res = {...res, out: wfOut, ok: true};
-                }
+                res = {...res, out: wfOut, ok: !failsWfCap && wfOutputs < 2 };
                 break;
         }
         if (res.ok) {

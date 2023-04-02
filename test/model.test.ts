@@ -25,6 +25,18 @@ function testElementaryInvalid(fn: Fn, cell: Cell, role: Role): void {
     base.t1.tx(1, base.p3); // add an extra output making this invalid
 }
 
+function testWorkflowValid(fn: Fn, cell: Cell, role: Role): void {
+    const r = role("default");
+    const p1 = cell("p1", 1, 1, {x: 100, y: 100});
+    const p2 = cell("p2", 0, 1, {x: 300, y: 100});
+
+    const t1 = fn("t1", r, {x: 200, y: 100});
+
+    // t1 can fire if either p1 or p2 is populated
+    p1.tx(1, t1);
+    p2.tx(1, t1);
+}
+
 
 function testModel({declaration, type}: { declaration: Declaration; type: ModelType }) {
     const m = newModel({
@@ -33,12 +45,13 @@ function testModel({declaration, type}: { declaration: Declaration; type: ModelT
         type,
     });
     const state = m.initialVector();
-    return (action: string, opts?: { expectPass?: boolean; expectFail?: boolean }) => {
+    const trigger = (action: string, opts?: { expectPass?: boolean; expectFail?: boolean }) => {
         m.fire(state, action, 1,
             () => expect(opts?.expectPass).to.be.true,
             () => expect(opts?.expectFail).to.be.true,
         );
     };
+    return {state, trigger};
 }
 
 describe("metamodel", () => {
@@ -58,7 +71,7 @@ describe("metamodel", () => {
         });
 
         it("should still work for invalid elementary models", () => {
-            const trigger = testModel({declaration: testElementaryInvalid, type: ModelType.petriNet});
+            const {trigger} = testModel({declaration: testElementaryInvalid, type: ModelType.petriNet});
             trigger("t1", {expectPass: true});
             trigger("t1", {expectFail: true});
         });
@@ -67,15 +80,25 @@ describe("metamodel", () => {
 
     describe("elementary", () => {
         it("should work for valid models", () => {
-            const trigger = testModel({declaration: testElementaryValid, type: ModelType.elementary});
+            const {trigger} = testModel({declaration: testElementaryValid, type: ModelType.elementary});
             trigger("t1", {expectPass: true});
             trigger("t1", {expectFail: true});
         });
 
         it("should not work for invalid models", () => {
-            const trigger = testModel({declaration: testElementaryInvalid, type: ModelType.elementary});
+            const {trigger} = testModel({declaration: testElementaryInvalid, type: ModelType.elementary});
             trigger("t1", {expectFail: true});
+        });
+    });
+
+    describe("workflow", () => {
+        it("should not work for invalid models", () => {
+            const {trigger} = testModel({declaration: testElementaryInvalid, type: ModelType.workflow});
             trigger("t1", {expectFail: true});
+        });
+        it("should allow 'OR' input from two places to single transition", () => {
+            const {trigger} = testModel({declaration: testWorkflowValid, type: ModelType.workflow});
+            trigger("t1", {expectPass: true});
         });
     });
 });
