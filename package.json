@@ -1,10 +1,22 @@
 {
   "name": "@pflow-dev/metamodel",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "main": "/dist/index.js",
+  "types": "/dist/index.d.ts",
   "description": "create workflows and petriNets with a DSL",
   "files": [
-    "dist"
+    "model.js.map",
+    "model.js",
+    "model.d.ts",
+    "snapshot.js.map",
+    "snapshot.js",
+    "snapshot.d.ts",
+    "stream.js.map",
+    "stream.js",
+    "stream.d.ts",
+    "index.js.map",
+    "index.js",
+    "index.d.ts"
   ],
   "repository": {
     "type": "git",
@@ -17,6 +29,8 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:github": "tsc -p tsconfig.json && mv ./dist/* .",
+    "clean": "rm model.* snapshot.* stream.* index.* *.tgz",
     "lint": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
     "test": "jest --forceExit --coverage --verbose --detectOpenHandles"
   },
@@ -35,6 +49,5 @@
     "jest": "^26.1.0",
     "ts-jest": "^26.1.1",
     "typescript": "^4.9.4"
-  },
-  "types": ".//dist/index.d.ts"
+  }
 }
