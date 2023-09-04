@@ -1,5 +1,3 @@
-import assert from "assert";
-
 export interface RoleDef {
     label: string;
 }
@@ -100,6 +98,12 @@ export interface ModelOptions {
     schema: string;
     declaration?: Declaration;
     type?: ModelType;
+}
+
+function assert(test: any, message?: string): void {
+    if (!test) {
+        throw new Error(`Assert failed: ${message}`)
+    }
 }
 
 // load a model using internal js DSL
