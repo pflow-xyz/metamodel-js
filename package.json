@@ -1,8 +1,8 @@
 {
-  "name": "@pflow-dev/metamodel-js",
-  "version": "0.2.0",
-  "main": "./dist/index.js",
-  "description": "",
+  "name": "@pflow-dev/metamodel",
+  "version": "0.2.4",
+  "main": "/dist/index.js",
+  "description": "create workflows and petriNets with a DSL",
   "files": [
     "dist"
   ],
@@ -12,6 +12,9 @@
   },
   "author": "myork@stackdump.com",
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
@@ -32,5 +35,6 @@
     "jest": "^26.1.0",
     "ts-jest": "^26.1.1",
     "typescript": "^4.9.4"
-  }
+  },
+  "types": ".//dist/index.d.ts"
 }
