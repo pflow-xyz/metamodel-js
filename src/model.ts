@@ -1,3 +1,5 @@
+import assert from "assert";
+
 export interface RoleDef {
     label: string;
 }
@@ -31,7 +33,7 @@ export interface Transition {
     label: string;
     delta: Vector;
     role: RoleDef;
-    guards: Map<string, Guard>;
+    guards: Map<string, Guard>; // REVIEW: difference w/ pflow-eth imp. which uses single guard vector
     position: Position;
 }
 
@@ -60,9 +62,9 @@ export interface TxNode {
 }
 
 export enum ModelType {
+    elementary = "elementary",
     workflow = "workflow",
     petriNet = "petriNet",
-    elementary = "elementary",
 }
 
 export interface PetriNet {
@@ -90,6 +92,7 @@ export interface Model {
     capacityVector: () => Vector;
     testFire: (state: Vector, action: string, multiple: number) => Result;
     fire: (state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void) => Result;
+    pushState: (state: Vector, action: string, multiple: number) => Result;
     getSize: () => { width: number; height: number };
 }
 
@@ -185,9 +188,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     function emptyVector(): Vector {
         const v: Vector = [];
-        for (const [, p] of def.places) {
+        def.places.forEach((p) => {
             v[p.offset] = 0;
-        }
+        });
         return v;
     }
 
@@ -212,18 +215,20 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     function capacityVector(): Vector {
         const v: Vector = [];
-        for (const [, p] of def.places) {
+        def.places.forEach((p) => {
             if (def.type === ModelType.elementary && p.capacity > 1) {
                 throw new Error("Elementary models can only have arcs of weight 1");
             }
             v[p.offset] = p.capacity;
-        }
+        });
         return v;
     }
 
     function index(): boolean {
         for (const label in def.transitions) {
-            def.transitions.get(label).delta = emptyVector(); // right size all deltas
+            const t = def.transitions.get(label);
+            assert(t, "transition not found");
+            t.delta = emptyVector(); // right size all deltas
         }
         let ok = true;
         for (const arc of Object.values(arcs)) {
@@ -360,6 +365,28 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         return {width: limitX + margin, height: limitY + margin};
     }
 
+    // Allow OR behavior for optional model paths
+    // this allows for workflow models
+    function pushState(state: Vector, action: string, multiple: number): Result {
+        const res = testFire(state, action, multiple);
+        const out = emptyVector();
+        let outStates = 0;
+
+        for (const i in res.out) {
+            if (res.out[i] > 0) {
+                outStates++;
+            }
+            if (res.out[i] < 0) {
+                out[i] = 0; // ignore negative values
+            }
+            out[i] = res.out[i];
+        }
+        if (outStates <= 1) {
+            res.ok = true;
+        }
+        return { out, ok: res.ok, role: res.role };
+    }
+
     if (declaration) {
         declaration(fn, cell, role);
         if (!index()) {
@@ -377,6 +404,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         capacityVector,
         testFire,
         fire,
+        pushState,
         getSize
     };
 }

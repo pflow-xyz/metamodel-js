@@ -6,8 +6,9 @@ NPM package
 WIP
 ---
 
-- [ ] fix build scripts & publish to NPM
 - [ ] build/test browser target
+- [ ] add better tests for all net types (workflows, etc)
+- [ ] fix build scripts & publish to NPM
 
 ICEBOX
 ------
