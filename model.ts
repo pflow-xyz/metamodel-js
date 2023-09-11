@@ -13,8 +13,16 @@ export type Cell = (label: string, initial: number, capacity: number, position: 
 export type Role = (label: string) => RoleDef
 export type Declaration = (fn: Fn, cell: Cell, role: Role) => void
 export type Vector = number[];
+export type MetaType = "place" | "transition" | "arc";
 
-export interface Place {
+interface TypeAnnotation {
+    metaType: MetaType;
+}
+
+export type MetaObject = Place | Transition | Arc;
+
+export interface Place extends TypeAnnotation {
+    metaType: "place";
     label: string;
     offset: number;
     initial: number;
@@ -27,7 +35,8 @@ export interface Guard {
     delta: Vector;
 }
 
-export interface Transition {
+export interface Transition extends TypeAnnotation{
+    metaType: "transition";
     label: string;
     delta: Vector;
     role: RoleDef;
@@ -35,7 +44,8 @@ export interface Transition {
     position: Position;
 }
 
-export interface Arc {
+export interface Arc extends TypeAnnotation {
+    metaType: "arc";
     source: {
         place?: Place;
         transition?: Transition;
@@ -100,12 +110,6 @@ export interface ModelOptions {
     type?: ModelType;
 }
 
-function assert(test: any, message?: string): void {
-    if (!test) {
-        throw new Error(`Assert failed: ${message}`)
-    }
-}
-
 // load a model using internal js DSL
 export function newModel({schema, declaration, type}: ModelOptions): Model {
     const arcs = Array<Arc>();
@@ -121,6 +125,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     function fn(label: string, role: RoleDef, position: Position): TxNode {
         const transition: Transition = {
+            metaType: "transition",
             label,
             role,
             position,
@@ -134,6 +139,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                 throw new Error(`elementary models only support weight 1, got ${weight}`);
             }
             arcs.push({
+                metaType: "arc",
                 source: {transition: transition},
                 target: {place: target.place},
                 weight,
@@ -146,7 +152,8 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     let placeCount = 0;
 
     function cell(label: string, initial?: number, capacity?: number, position?: Position): PlaceNode {
-        const place = {
+        const place: Place = {
+            metaType: "place",
             label: label,
             initial: initial || 0,
             capacity: capacity || 0,
@@ -161,6 +168,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                 throw new Error(`elementary models only support weight 1, got ${weight}`);
             }
             arcs.push({
+                metaType: "arc",
                 source: {place: place},
                 target: {transition: target.transition},
                 weight: weight,
@@ -172,6 +180,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                 throw new Error(`elementary models only support weight 1, got ${weight}`);
             }
             arcs.push({
+                metaType: "arc",
                 source: {place},
                 target: {transition: target.transition},
                 weight: weight,
@@ -231,7 +240,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     function index(): boolean {
         for (const label in def.transitions) {
             const t = def.transitions.get(label);
-            assert(t, "transition not found");
+            if (!t) {
+                throw new Error(`missing transition: ${label}`);
+            }
             t.delta = emptyVector(); // right size all deltas
         }
         let ok = true;

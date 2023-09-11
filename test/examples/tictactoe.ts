@@ -1,4 +1,4 @@
-import {Cell, Fn, PlaceNode, Role, RoleDef} from "../../src/model";
+import {Cell, Fn, PlaceNode, Role, RoleDef} from "../../model";
 
 
 // visual spacing

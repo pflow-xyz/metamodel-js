@@ -1,6 +1,6 @@
 import {tictactoe} from "./examples";
-import {Stream} from "../src/stream";
-import {newModel} from "../src";
+import {Stream} from "../stream";
+import {newModel} from "../";
 
 interface MyEvent {
     schema: string;

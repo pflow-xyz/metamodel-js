@@ -1,4 +1,4 @@
-import {newModel, snapshot} from "../src";
+import {newModel, snapshot} from "../";
 import {tictactoe} from "./examples";
 
 it("should render a snapshot", () => {

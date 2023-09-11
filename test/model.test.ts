@@ -1,6 +1,6 @@
 import {expect} from "chai";
 import {tictactoe} from "./examples";
-import {Cell, Declaration, Fn, ModelType, newModel, PlaceNode, Role, TxNode} from "../src";
+import {Cell, Declaration, Fn, ModelType, newModel, PlaceNode, Role, TxNode} from "../";
 
 function testElementaryValid(fn: Fn, cell: Cell, role: Role): {
     p1: PlaceNode;
