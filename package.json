@@ -34,7 +34,6 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "build:github": "tsc -p tsconfig.json && mv ./dist/* .",
     "clean": "git clean -df",
     "lint": "tsc --noEmit && eslint \"**/*.{js,ts}\" --quiet --fix",
     "test": "jest --forceExit --coverage --verbose --detectOpenHandles"
