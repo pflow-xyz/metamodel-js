@@ -1,6 +1,6 @@
 {
   "name": "@pflow-dev/metamodel",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "main": "/index.js",
   "types": "/index.d.ts",
   "description": "create workflows and petriNets with a DSL",

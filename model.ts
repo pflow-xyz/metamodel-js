@@ -286,7 +286,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     function guardFails(state: Vector, action: string, multiple: number) {
         const t = def.transitions.get(action);
         if (t && t.guards) {
-            for (const guard of Object.values(t.guards)) {
+            for (const [,guard] of t.guards.entries()) {
                 const res = vectorAdd(state, guard.delta, multiple);
                 if (res.ok) {
                     return true; // inhibitor active
