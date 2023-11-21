@@ -113,16 +113,16 @@ export function snapshot(model: Model, options?: { hashChar?: HashChar }) {
     });
     let arcTags = "";
     transitions.forEach((t) => {
-        for (const label in t.guards) {
-            const place = places.get(label);
-            const pts = getArcPoints({source: t, target: place});
+        t.guards.forEach((v, k) => {
+            const place = places.get(k);
+            const pts = getArcPoints({source: place, target: t});
             arcTags += arcTemplate({
                 ...pts,
                 stroke: "black",
                 markerEnd: `url(${hashChar}markerInhibit1)`,
-                weight: Math.abs(t.guards.get(label).delta[place.offset])
+                weight: Math.abs(v.delta[place.offset])
             });
-        }
+        });
     });
     // TODO: support snapshot while running
     transitions.forEach((t) => {
