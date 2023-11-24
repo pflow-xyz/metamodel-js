@@ -88,6 +88,9 @@ export interface Result {
     out: Vector;
     ok: boolean;
     role: string;
+    inhibited?: boolean;
+    overflow?: boolean;
+    underflow?: boolean;
 }
 
 export interface Model {
@@ -268,19 +271,25 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         return ok;
     }
 
-    function vectorAdd(state: Vector, delta: Vector, multiple: number): { out: Vector; ok: boolean } {
+    function vectorAdd(state: Vector, delta: Vector, multiple: number): {
+        out: Vector; ok: boolean; overflow: boolean; underflow: boolean;
+    } {
+        let overflow = false;
+        let underflow = false;
         const cap = capacityVector();
         const out: Vector = [];
         let ok = true;
         for (const i in state) {
             out[i] = (state[i] + (delta[i] || 0) * multiple);
             if (out[i] < 0) {
+                underflow = true;
                 ok = false; // underflow: contains negative
             } else if (cap[i] > 0 && cap[i] - out[i] < 0) {
+                overflow = true;
                 ok = false; // overflow: exceeds capacity
             }
         }
-        return {out, ok};
+        return {out, ok, overflow, underflow};
     }
 
     function guardFails(state: Vector, action: string, multiple: number) {
@@ -300,11 +309,12 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     function testFire(state: Vector, action: string, multiple: number): Result {
         const t = def.transitions.get(action);
-        if (!t || guardFails(state, action, multiple)) {
-            return {out: [], ok: false, role: t?.role?.label || "unknown"};
+        const inhibited = guardFails(state, action, multiple);
+        if (!t || inhibited) {
+            return {out: [], ok: false, role: t?.role?.label || "unknown", inhibited};
         }
-        const res = vectorAdd(state, t.delta, multiple);
-        return {out: res.out, ok: res.ok, role: t.role.label};
+        const {out, ok,underflow, overflow} = vectorAdd(state, t.delta, multiple);
+        return {out, ok, role: t.role.label, inhibited, overflow, underflow};
     }
 
     function fire(state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void): Result {
@@ -324,7 +334,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                         elementaryOutputs++;
                     }
                 }
-                res = {...res, ok: !failsHardCap && elementaryOutputs < 2 };
+                res = {...res, ok: !failsHardCap && elementaryOutputs < 2, overflow: failsHardCap };
                 break;
             case ModelType.workflow:
                 let wfOutputs = 0;
@@ -339,7 +349,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                         wfOut[i] = res.out[i];
                     } // NOTE: ignore negative values
                 }
-                res = {...res, out: wfOut, ok: !failsWfCap && wfOutputs < 2 };
+                res = {...res, out: wfOut, ok: !failsWfCap && wfOutputs < 2, overflow: failsWfCap };
                 break;
         }
         if (res.ok) {
@@ -399,7 +409,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         if (outStates <= 1) {
             res.ok = true;
         }
-        return { out, ok: res.ok, role: res.role };
+        return { out, ok: res.ok, role: res.role, inhibited: res.inhibited };
     }
 
     if (declaration) {

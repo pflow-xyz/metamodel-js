@@ -1,4 +1,4 @@
-import {Model, Place, Transition} from "./model";
+import {Model, Place, Transition, Vector} from "./model";
 
 const tokenTemplate = ({p, tokens}: { p: Place; tokens: number }) => {
     if (tokens === 0) {
@@ -32,12 +32,13 @@ interface ArcParams {
 const arcTemplate = ({stroke, markerEnd, weight, x1, y1, x2, y2, midX, offsetX, midY, offsetY}: ArcParams) =>
     `<line stroke="${stroke}"  marker-end="${markerEnd}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" />` +
     `<text x="${midX - offsetX}" y="${midY + offsetY}" >${weight}</text>`;
+
 const transitionTemplate = ({fill, stroke, t}: { fill: string; stroke: string; t: Transition }) =>
     `<rect width="30" height="30" fill="${fill}" stroke="${stroke}" rx="${4}" x="${t.position.x - 15}" y="${t.position.y - 15}" />` +
     `<text font-size="smaller" x="${t.position.x - 15}" y="${t.position.y - 20}" >${t.label}</text>`;
-const placeTemplate = ({p}: { p: Place }) =>
+const placeTemplate = ({p, tokens}: { p: Place; tokens: number }) =>
     `<circle cx="${p.position.x}" cy="${p.position.y}" r="16" fill="white" stroke="black"  />` +
-    `${tokenTemplate({p, tokens: p.initial})}` +
+    `${tokenTemplate({p, tokens})}` +
     `<text font-size="smaller" x="${p.position.x - 18}" y="${p.position.y - 20}" >${p.label}</text>`;
 const template = ({
                       page,
@@ -92,15 +93,25 @@ function getArcPoints(
 
 type HashChar = "#" | "%32";
 
-export function snapshot(model: Model, options?: { hashChar?: HashChar }) {
+export function snapshot(model: Model, options?: { state?: Vector; hashChar?: HashChar }) {
+    const state = options?.state;
     const hashChar = options?.hashChar ? options.hashChar : "#"; // use "%32" for data URI
-
     const {transitions, places} = model.def;
     const page = model.getSize(); // FIXME: port from other repo
     let transitionTags = "";
     transitions.forEach((t) => {
+        function getFill() {
+            const res = model.testFire(state, t.label, 1);
+            if (res.ok) {
+                return "#62fa75";
+            }
+            if (res.inhibited) {
+                return "#fab5b0";
+            }
+            return "#ffffff";
+        }
         transitionTags += transitionTemplate({
-            fill: "white",
+            fill: getFill(), // "white", // TODO: colorize model
             stroke: "black",
             t,
         });
@@ -108,7 +119,7 @@ export function snapshot(model: Model, options?: { hashChar?: HashChar }) {
     const placeIndex: Array<Place> = [];
     let placeTags = "";
     places.forEach((p) => {
-        placeTags += placeTemplate({p: p});
+        placeTags += placeTemplate({p: p, tokens: state? state[p.offset] : p.initial});
         placeIndex[p.offset] = p;
     });
     let arcTags = "";
