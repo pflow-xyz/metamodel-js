@@ -38,10 +38,15 @@ export interface Guard {
 export interface Transition extends TypeAnnotation{
     metaType: "transition";
     label: string;
-    delta: Vector;
     role: RoleDef;
-    guards: Map<string, Guard>; // REVIEW: difference w/ pflow-eth imp. which uses single guard vector
+    delta: Vector;
+    guards: Map<string, Guard>;
+    allowReentry: boolean;
     position: Position;
+    subnet?: {
+        m: Model;
+        type: "entry" | "exit";
+    };
 }
 
 export interface Arc extends TypeAnnotation {
@@ -129,6 +134,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     function fn(label: string, role: RoleDef, position: Position): TxNode {
         const transition: Transition = {
             metaType: "transition",
+            allowReentry: false,
             label,
             role,
             position,
