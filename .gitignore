@@ -26,3 +26,18 @@ yarn-error.log*
 *.swp
 dist
 dist.browser
+
+# dist files
+index.d.ts
+index.js
+index.js.map
+model.d.ts
+model.js
+model.js.map
+snapshot.d.ts
+snapshot.js
+snapshot.js.map
+stream.d.ts
+stream.js
+stream.js.map
+test.svg

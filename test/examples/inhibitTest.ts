@@ -9,6 +9,15 @@ export function inhibitTest(fn: mm.Fn, cell: mm.Cell, role: mm.Role): void {
     const foo = cell("foo", 1, 0, pos(6, 2));
     const bar = fn("bar", defaultRole, pos(5, 4));
     const baz = fn("baz", defaultRole, pos(7, 4));
-    foo.guard(1, baz);
+    foo.guard(1, baz); // foo is inhibited while threshold is satisfied i.e >= 1
     foo.tx(1, bar);
+}
+
+export function reverseInhibitTest(fn: mm.Fn, cell: mm.Cell, role: mm.Role): void {
+    const defaultRole = role("default");
+    const foo = cell("foo", 1, 0, pos(6, 2));
+    const bar = fn("bar", defaultRole, pos(5, 4));
+    const baz = fn("baz", defaultRole, pos(7, 4));
+    baz.guard(3, foo); // reverse the guard: foo is inhibited until threshold is reached i.e. < 3
+    bar.tx(1, foo); // count up!!
 }

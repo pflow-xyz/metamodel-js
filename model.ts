@@ -1,3 +1,8 @@
+import * as mm from "./index";
+
+type Version = "v0" | "v1";
+const version: Version = "v0";
+
 export interface RoleDef {
     label: string;
 }
@@ -11,7 +16,7 @@ export interface Position {
 export type Fn = (label: string, role: RoleDef, position: Position) => TxNode
 export type Cell = (label: string, initial: number, capacity: number, position: Position) => PlaceNode
 export type Role = (label: string) => RoleDef
-export type Declaration = (fn: Fn, cell: Cell, role: Role) => void
+export type DeclarationFunction = (fn: Fn, cell: Cell, role: Role) => void
 export type Vector = number[];
 export type MetaType = "place" | "transition" | "arc";
 
@@ -33,9 +38,10 @@ export interface Place extends TypeAnnotation {
 export interface Guard {
     label: string;
     delta: Vector;
+    inverted?: boolean;
 }
 
-export interface Transition extends TypeAnnotation{
+export interface Transition extends TypeAnnotation {
     metaType: "transition";
     label: string;
     role: RoleDef;
@@ -51,6 +57,7 @@ export interface Transition extends TypeAnnotation{
 
 export interface Arc extends TypeAnnotation {
     metaType: "arc";
+    offset: number;
     source: {
         place?: Place;
         transition?: Transition;
@@ -61,17 +68,27 @@ export interface Arc extends TypeAnnotation {
     };
     weight: number;
     inhibit?: boolean;
+    reentry?: boolean;
+    inverted?: boolean;
 }
 
-export interface PlaceNode {
+export interface NodeType {
+    nodeType: "place" | "transition";
+}
+
+export interface PlaceNode extends NodeType {
+    nodeType: "place";
     place: Place;
     tx: (weight: number, target: TxNode) => void;
     guard: (weight: number, target: TxNode) => void;
 }
 
-export interface TxNode {
+export interface TxNode extends NodeType {
+    nodeType: "transition";
     transition: Transition;
     tx: (weight: number, target: PlaceNode) => void;
+    guard: (weight: number, target: PlaceNode) => void;
+    reentry: (target: PlaceNode) => void;
 }
 
 export enum ModelType {
@@ -99,26 +116,59 @@ export interface Result {
 }
 
 export interface Model {
-    dsl: { fn: Fn; cell: Cell; role: Role };
-    def: PetriNet;
-    index: () => void;
-    guardFails: (state: Vector, action: string, multiple: number) => boolean;
-    emptyVector: () => Vector;
-    initialVector: () => Vector;
+    addPlace: (coords: { x: number; y: number }) => boolean;
+    addTransition: (coords: { x: number; y: number }) => boolean;
     capacityVector: () => Vector;
-    testFire: (state: Vector, action: string, multiple: number) => Result;
+    def: PetriNet;
+    deleteArc: (id: number) => void;
+    deletePlace: (id: string) => void;
+    deleteTransition: (id: string) => void;
+    dsl: { fn: Fn; cell: Cell; role: Role };
+    emptyVector: () => Vector;
     fire: (state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void) => Result;
-    pushState: (state: Vector, action: string, multiple: number) => Result;
+    getObject: (id: string) => Place | Transition;
+    getPlace: (label: string | number) => Place;
     getSize: () => { width: number; height: number };
+    guardFails: (state: Vector, action: string, multiple: number) => boolean;
+    indexArcs: () => void;
+    initialVector: () => Vector;
+    newLabel: (label: string, suffix?: number) => string;
+    objectExists: (id: string) => boolean;
+    pushState: (state: Vector, action: string, multiple: number) => Result;
+    rebuildArcs: () => void;
+    renamePlace: (oldLabel: string, newLabel: string) => void;
+    renameTransition: (oldLabel: string, newLabel: string) => void;
+    setArcWeight: (offset: number, weight: number) => boolean;
+    testFire: (state: Vector, action: string, multiple: number) => Result;
+    toObject: (mode?: "sparse" | "full") => any;
+    toggleInhibitor: (id: number) => boolean;
+    transitionSeq: () => string;
 }
+
+export type ModelDeclaration = {
+    modelType: ModelType;
+    version: Version;
+    places: {
+        [key: string]: { initial?: number; capacity?: number; x: number; y: number  };
+    };
+    transitions: {
+        [key: string]: { role?: string; x: number; y: number };
+    };
+    arcs: {
+        source: string;
+        target: string;
+        weight: number;
+        inhibit?: boolean;
+        reentry?: boolean;
+    }[];
+};
 
 export interface ModelOptions {
     schema: string;
-    declaration?: Declaration;
+    declaration?: DeclarationFunction | ModelDeclaration;
     type?: ModelType;
 }
 
-// load a model using internal js DSL
 export function newModel({schema, declaration, type}: ModelOptions): Model {
     const arcs = Array<Arc>();
 
@@ -149,16 +199,45 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             }
             arcs.push({
                 metaType: "arc",
+                offset: arcs.length,
                 source: {transition: transition},
                 target: {place: target.place},
                 weight,
             });
         };
 
-        return {transition, tx};
-    }
+        const reentry = (target: PlaceNode): void => {
+            if (def.type !== ModelType.workflow) {
+                throw new Error("reentry only supported for workflow models");
+            }
+            arcs.push({
+                metaType: "arc",
+                offset: arcs.length,
+                source: {transition: transition},
+                target: {place: target.place},
+                weight: 0,
+                reentry: true,
+            });
+            transition.allowReentry = true;
+        };
 
-    let placeCount = 0;
+        function guard(weight: number, target: PlaceNode) {
+            if (def.type === ModelType.elementary && weight !== 1) {
+                throw new Error(`elementary models only support weight 1, got ${weight}`);
+            }
+            arcs.push({
+                metaType: "arc",
+                offset: arcs.length,
+                source: {transition},
+                target: {place: target.place},
+                weight: weight,
+                inhibit: true,
+                inverted: true
+            });
+        }
+
+        return {nodeType: "transition", transition, tx, guard, reentry};
+    }
 
     function cell(label: string, initial?: number, capacity?: number, position?: Position): PlaceNode {
         const place: Place = {
@@ -167,9 +246,8 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             initial: initial || 0,
             capacity: capacity || 0,
             position: position || {x: 0, y: 0, z: 0},
-            offset: placeCount
+            offset: def.places.size,
         };
-        placeCount = placeCount + 1; // NOTE: js arrays begin with index 0
         def.places.set(label, place);
 
         function tx(weight: number, target: TxNode): void {
@@ -178,6 +256,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             }
             arcs.push({
                 metaType: "arc",
+                offset: arcs.length,
                 source: {place: place},
                 target: {transition: target.transition},
                 weight: weight,
@@ -190,14 +269,16 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             }
             arcs.push({
                 metaType: "arc",
+                offset: arcs.length,
                 source: {place},
                 target: {transition: target.transition},
                 weight: weight,
-                inhibit: true
+                inhibit: true,
+                inverted: false
             });
         }
 
-        return {place, tx, guard};
+        return {nodeType: "place", place, tx, guard};
     }
 
     function role(label: string): RoleDef {
@@ -246,7 +327,10 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         return v;
     }
 
-    function index(): boolean {
+    /**
+     * Build vector index for transitions using defined arcs
+     */
+    function indexArcs(): boolean {
         for (const label in def.transitions) {
             const t = def.transitions.get(label);
             if (!t) {
@@ -255,17 +339,26 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             t.delta = emptyVector(); // right size all deltas
         }
         let ok = true;
-        for (const arc of Object.values(arcs)) {
+        arcs.forEach((arc) => {
+            if (arc.reentry) {
+                if (def.type !== ModelType.workflow) {
+                    throw new Error("reentry only supported for workflow models");
+                }
+                return;
+            }
             if (def.type === ModelType.elementary && (arc.weight > 1 || arc.weight < -1)) {
                 throw new Error("Elementary models can only have arcs of weight 1");
             }
-            if (arc.inhibit && arc.source.place && arc.target.transition) {
-                const g = {
-                    label: arc.source.place.label,
+            if (arc.inhibit) {
+                const place = arc.inverted ? arc.target.place : arc.source.place;
+                const transition = arc.inverted ? arc.source.transition : arc.target.transition;
+                const g: Guard = {
+                    label: place.label,
                     delta: emptyVector(),
+                    inverted: !!arc.inverted,
                 };
-                g.delta[arc.source.place.offset] = 0 - arc.weight;
-                arc.target.transition.guards.set(arc.source.place.label, g);
+                g.delta[place.offset] = 0 - arc.weight;
+                transition.guards.set(place.label, g);
             } else if (arc.source.transition && arc.target.place) {
                 arc.source.transition.delta[arc.target.place.offset] = arc.weight;
             } else if (arc.target.transition && arc.source.place) {
@@ -273,8 +366,69 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             } else {
                 ok = false;
             }
-        }
+
+        });
         return ok;
+    }
+
+    /**
+     * Rebuild arcs from vector index
+     */
+    function rebuildArcs() {
+        def.arcs = [];
+        // TODO: does this really work add a test for this
+
+        const offsetToPlace = new Map<number, Place>();
+        def.places.forEach((p) => {
+            offsetToPlace.set(p.offset, p);
+        });
+
+        def.transitions.forEach((t) => {
+            t.delta.forEach((i, d) => {
+                if (d < 0) {
+                    def.arcs.push({
+                        metaType: "arc",
+                        offset: def.arcs.length,
+                        source: {place: offsetToPlace.get(i)},
+                        target: {transition: t},
+                        weight: 0 - d,
+                    });
+                } else if (d > 0) { //
+                    def.arcs.push({
+                        metaType: "arc",
+                        offset: def.arcs.length,
+                        source: {transition: t},
+                        target: {place: offsetToPlace.get(i)},
+                        weight: d,
+                    });
+                }
+            });
+
+            t.guards.forEach((g) => {
+                g.delta.forEach((i, d) => {
+                    if (g.inverted) {
+                        def.arcs.push({
+                            metaType: "arc",
+                            offset: def.arcs.length,
+                            source: {transition: t},
+                            target: {place: offsetToPlace.get(i)},
+                            weight: 0 - d,
+                            inhibit: true,
+                            inverted: true,
+                        });
+                    } else {
+                        def.arcs.push({
+                            metaType: "arc",
+                            offset: def.arcs.length,
+                            source: {place: offsetToPlace.get(i)},
+                            target: {transition: t},
+                            weight: 0 - d,
+                            inhibit: true,
+                        });
+                    }
+                });
+            });
+        });
     }
 
     function vectorAdd(state: Vector, delta: Vector, multiple: number): {
@@ -301,10 +455,13 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
     function guardFails(state: Vector, action: string, multiple: number) {
         const t = def.transitions.get(action);
         if (t && t.guards) {
-            for (const [,guard] of t.guards.entries()) {
+            for (const [, guard] of t.guards.entries()) {
                 const res = vectorAdd(state, guard.delta, multiple);
-                if (res.ok) {
+                if (!guard.inverted && res.ok) {
                     return true; // inhibitor active
+                }
+                if (guard.inverted && !res.ok) {
+                    return true; // inverted inhibitor active
                 }
             }
         } else {
@@ -319,44 +476,87 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         if (!t || inhibited) {
             return {out: [], ok: false, role: t?.role?.label || "unknown", inhibited};
         }
-        const {out, ok,underflow, overflow} = vectorAdd(state, t.delta, multiple);
+        const {out, ok, underflow, overflow} = vectorAdd(state, t.delta, multiple);
         return {out, ok, role: t.role.label, inhibited, overflow, underflow};
     }
 
+    function elementaryFire(state: Vector, action: string, multiple: number): Result {
+        const res = testFire(state, action, multiple);
+        if (!res.ok) {
+            return res;
+        }
+        let elementaryOutputs = 0;
+        let failsHardCap = false;
+        for (const i in res.out) {
+            if (res.out[i] > 1) {
+                failsHardCap = true;
+            }
+            if (res.out[i] > 0) {
+                elementaryOutputs++;
+            }
+        }
+        return {...res, ok: !failsHardCap && elementaryOutputs < 2, overflow: failsHardCap};
+    }
+
+    function workflowFire(state: Vector, action: string, multiple: number): Result {
+        const res = testFire(state, action, multiple);
+        let wfOutputs = 0;
+        let overflowOutputs = 0;
+        const wfOut = emptyVector();
+        const t = def.transitions.get(action);
+        if (!t) {
+            throw new Error("action not found");
+        }
+
+        if (res.inhibited) {
+            return res;
+        }
+
+        for (const i in res.out) {
+            if (res.out[i] > 1) {
+                wfOut[i] = 1; // correct for overflow
+                overflowOutputs++;
+            }
+            if (res.out[i] > 0) {
+                wfOutputs++;
+                wfOut[i] = 1;
+            }
+            if (res.out[i] < 0) {
+                wfOut[i] = 0; // correct for underflow
+                res.underflow = false;
+            }
+        }
+        if (wfOutputs == 0) {
+            res.ok = true;
+        } else if (wfOutputs == 1) {
+            if (overflowOutputs == 1) {
+                if (t.allowReentry) {
+                    res.ok = true;
+                    res.overflow = false;
+                }
+            } else if (overflowOutputs == 0) {
+                res.ok = true;
+            }
+        } else if (wfOutputs > 1) {
+            res.ok = false;
+        }
+        return {...res, out: wfOut};
+    }
+
     function fire(state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void): Result {
-        let res = testFire(state, action, multiple);
+        let res: Result;
         switch (def.type) {
+            case ModelType.petriNet:
+                res = testFire(state, action, multiple);
+                break;
             case ModelType.elementary:
-                if (!res.ok) {
-                    break;
-                }
-                let elementaryOutputs = 0;
-                let failsHardCap = false;
-                for (const i in res.out) {
-                    if (res.out[i] > 1) {
-                        failsHardCap = true;
-                    }
-                    if (res.out[i] > 0) {
-                        elementaryOutputs++;
-                    }
-                }
-                res = {...res, ok: !failsHardCap && elementaryOutputs < 2, overflow: failsHardCap };
+                res = elementaryFire(state, action, multiple);
                 break;
             case ModelType.workflow:
-                let wfOutputs = 0;
-                let failsWfCap = false;
-                const wfOut = emptyVector();
-                for (const i in res.out) {
-                    if (res.out[i] > 1) {
-                        failsWfCap = true;
-                    }
-                    if (res.out[i] > 0) {
-                        wfOutputs++;
-                        wfOut[i] = res.out[i];
-                    } // NOTE: ignore negative values
-                }
-                res = {...res, out: wfOut, ok: !failsWfCap && wfOutputs < 2, overflow: failsWfCap };
+                res = workflowFire(state, action, multiple);
                 break;
+            default:
+                throw new Error("unknown model type");
         }
         if (res.ok) {
             for (const i in res.out) {
@@ -392,7 +592,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                 limitY = t.position.y;
             }
         });
-        const margin = 100;
+        const margin = 60;
         return {width: limitX + margin, height: limitY + margin};
     }
 
@@ -415,27 +615,447 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         if (outStates <= 1) {
             res.ok = true;
         }
-        return { out, ok: res.ok, role: res.role, inhibited: res.inhibited };
+        return {out, ok: res.ok, role: res.role, inhibited: res.inhibited};
+    }
+
+    function getPlace(label: string | number): Place {
+        if (typeof label === "number") {
+            // find place by offset
+            for (const [, p] of def.places) {
+                if (p.offset === label) {
+                    return p;
+                }
+            }
+        }
+        if (typeof label === "string") {
+            // find place by label
+            const p = def.places.get(label);
+            if (p) {
+                return p;
+            }
+        }
+        throw new Error("invalid place label");
+    }
+
+    function renamePlace(oldLabel: string, newLabel: string): void {
+        const p = def.places.get(oldLabel);
+        if (!p) {
+            throw new Error("invalid place label");
+        }
+        p.label = newLabel;
+        def.places.delete(oldLabel);
+        def.places.set(newLabel, p);
+        def.transitions.forEach((t) => {
+            const g = t.guards.get(oldLabel);
+            if (g) {
+                g.label = newLabel;
+                t.guards.delete(oldLabel);
+                t.guards.set(newLabel, g);
+            }
+        });
+    }
+
+    function renameTransition(oldLabel: string, newLabel: string): void {
+        const t = def.transitions.get(oldLabel);
+        if (!t) {
+            throw new Error("invalid transition label");
+        }
+        t.label = newLabel;
+        def.transitions.delete(oldLabel);
+        def.transitions.set(newLabel, t);
+    }
+
+    function deleteTransition(id: string): void {
+        def.transitions.delete(id);
+        def.arcs = def.arcs.filter((a) => {
+            return a.source?.transition?.label !== id && a.target?.transition?.label !== id;
+        });
+        def.arcs.forEach((a, i) => a.offset = i);
+    }
+
+    function deletePlace(id: string): void {
+        const p = getPlace(id);
+        def.places.delete(id);
+        def.transitions.forEach((t) => {
+            delete t.delta[p.offset];
+            t.delta.forEach((k: number, v: number) => {
+                if (k > p.offset) {
+                    t.delta[k-1] = v;
+                    delete t.delta[k];
+                }
+            });
+            t.guards.delete(p.label);
+        });
+        def.arcs = def.arcs.filter((a) => {
+            return a.source?.place?.label !== id && a.target?.place?.label !== id;
+        });
+    }
+    function deleteArc(id: number): void {
+        const arc = def.arcs[id];
+        const source = arc.source?.place || arc.source?.transition;
+        const target = arc.target?.place || arc.target?.transition;
+        if (!source || !target) {
+        throw new Error("arc has no source or target: " + id);
+    }
+
+    if (source.metaType === "place" && target.metaType === "transition") {
+        const place = source as mm.Place;
+        const transition = target as mm.Transition;
+        transition.delta[place.offset] = 0;
+        target.guards.delete(place.label);
+    }
+    if (source.metaType === "transition" && target.metaType === "place") {
+        const place = target as mm.Place;
+        const transition = source as mm.Transition;
+        transition.delta[place.offset] = 0;
+        source.guards.delete(place.label);
+    }
+    def.arcs.splice(arc.offset, 1);
+    def.arcs.forEach((a, i) => a.offset = i);
+    // this.m.indexArcs();
+}
+
+    function toggleInhibitor(id: number): boolean {
+        const arc = def.arcs[id];
+        arc.inhibit = !arc.inhibit;
+        const place = arc.source?.place || arc.target?.place;
+        const transition = arc.source?.transition || arc.target?.transition;
+        if (!place || !transition) {
+            throw new Error("arc has no source or target: " + id);
+        }
+        if (arc.inhibit) { // became inhibitor
+            const g = {
+                label: place.label,
+                delta: emptyVector(),
+                inverted: !!arc.target?.place,
+                inhibit: true,
+            };
+            g.delta[place.offset] = 0-arc.weight;
+            transition.guards.set(place.label,g);
+            transition.delta[place.offset] = 0;
+        } else { // was inhibitor
+            transition.guards.delete(place.label);
+            if (arc.target?.place) {
+                transition.delta[place.offset] = arc.weight;
+            } else if (arc.source?.place){
+                transition.delta[place.offset] = 0-arc.weight;
+            } else {
+                throw new Error("arc has no source or target: " + id);
+            }
+        }
+        return true;
+    }
+
+    function exportObjectFull(): Record<string, any> {
+        let places = {};
+        let transitions = {};
+        const arcs: any = [];
+        def.places.forEach((p) => {
+            places = {...places, [p.label]: {...p}};
+        });
+        def.transitions.forEach((t) => {
+            let guards = {};
+            t.guards.forEach((g, k) => {
+                guards = {...guards, [k]: {...g}};
+            });
+            const { role, position, metaType } = t;
+            if (t.role.label !== "default") {
+                transitions = {...transitions, [t.label]: {metaType, role, ...position, guards}};
+            } else {
+                transitions = {...transitions, [t.label]: {metaType, role, ...position}};
+            }
+        });
+        def.arcs.forEach((a) => {
+            const {
+                source,
+                target,
+                weight,
+                inhibit,
+                offset,
+                reentry
+            } = a;
+            let rec: any = {
+                metaType: "arc",
+                offset,
+                weight,
+                inhibit,
+                reentry
+            };
+            if (a.source.place) {
+                rec = {...rec, source: source.place.label, target: target.transition.label};
+            } else {
+                rec = {...rec, source: source.transition.label, target: target.place.label};
+            }
+            arcs.push(rec);
+        });
+
+        return {
+            modelType: def.type,
+            version,
+            places,
+            transitions,
+            arcs
+        };
+    }
+
+    function exportDeclarationObject(): ModelDeclaration {
+        let places = {};
+        let transitions = {};
+        const arcs: any[] = [];
+        def.places.forEach((p: Place) => {
+            const {label, initial, capacity, offset, position} = p;
+            let pl: any = {offset, ...position};
+            if (initial) {
+                pl = {...pl, initial};
+            }
+            if (capacity) {
+                pl = {...pl, capacity};
+            }
+            places = {...places, [label]: pl};
+        });
+        def.transitions.forEach((t: Transition) => {
+            const {label, position} = t;
+            let guards = {};
+            t.guards.forEach((g, k) => {
+                const {delta} = g;
+                guards = {...guards, [k]: delta};
+            });
+            const role = t.role.label;
+            if (t.role.label !== "default") {
+                transitions = {...transitions, [label]: {role, ...position}};
+            } else {
+                transitions = {...transitions, [label]: {...position}};
+            }
+        });
+        def.arcs.forEach((a: Arc) => {
+            let rec: any = {
+                source: a.source?.transition?.label || a.source?.place?.label,
+                target: a.target?.transition?.label || a.target?.place?.label,
+                weight: Math.abs(a.weight)
+            };
+            if (a.inhibit) {
+                rec = {...rec, inhibit: true};
+            }
+            if (a.reentry) {
+                rec = {...rec, reentry: true};
+            }
+            arcs.push(rec);
+        });
+        return {
+            modelType: def.type,
+            version,
+            places,
+            transitions,
+            arcs
+        };
+    }
+
+    function toObject(mode?: "sparse" | "full"): any {
+        if (mode === "full") {
+            return exportObjectFull();
+        }
+        return exportDeclarationObject();
+    }
+
+    function placeSeq(): string {
+        let x = 0;
+        while (def.places.get("place" + x)) {
+            x++;
+        }
+        return "place" + x;
+    }
+
+    function transitionSeq() {
+        let x = 0;
+        while (def.transitions.get("txn" + x)) {
+            x++;
+        }
+        return "txn" + x;
+    }
+
+    function addPlace(coords: { x: number; y: number }): boolean {
+        const newOffset = def.places.size;
+        const label = placeSeq();
+        def.places.set(label, {
+            metaType: "place",
+            label: label,
+            initial: 0,
+            capacity: 0,
+            offset: newOffset,
+            position: {x: coords.x, y: coords.y}
+        });
+        def.transitions.forEach((t: Transition) => {
+            t.delta[newOffset] = 0;
+        });
+        return true;
+    }
+
+    function addTransition(coords: { x: number; y: number }): boolean {
+        const oid = transitionSeq();
+        def.transitions.set(oid, {
+            metaType: "transition",
+            label: oid,
+            role: {label: "default"},
+            delta: emptyVector(),
+            position: {x: coords.x, y: coords.y},
+            guards: new Map<string, mm.Guard>(),
+            allowReentry: false,
+        });
+        return true;
+    }
+
+    function objectExists(id: string): boolean {
+        return !!def.places.get(id) || !!def.transitions.get(id);
+    }
+
+    function getObject(id: string): Place | Transition {
+        return def.places.get(id) || def.transitions.get(id);
+    }
+
+    function newLabel(label: string, suffix?: number): string {
+        if (suffix) {
+            label = label + suffix;
+        }
+        if (!objectExists(label)) {
+            return label;
+        } else {
+            // if last char is a number, increment it
+            // REVIEW: consider supporting multi-digit numbers
+            const lastChar = label.slice(-1);
+            if (lastChar >= "0" && lastChar <= "9") {
+                const newSuffix = parseInt(lastChar) + 1;
+                return newLabel(label.slice(0, -1), newSuffix);
+            } else {
+                return newLabel(label, 1);
+            }
+        }
+    }
+
+    function setArcWeight(offset: number, weight: number): boolean {
+        const arc = def.arcs[offset];
+        if (!arc) {
+            throw new Error("missing arc.offset:" + offset);
+        }
+        if (weight <= 0) {
+            return false;
+        }
+        arc.weight = weight;
+        const place = arc.source?.place || arc.target?.place;
+        const transition = arc.source?.transition || arc.target?.transition;
+        if (!place || !transition) {
+            throw new Error("invalid arc");
+        }
+        if (arc.inhibit) { // was inhibitor
+            transition.guards.delete(place.label);
+            if (arc.target?.place) {
+                transition.delta[place.offset] = arc.weight;
+            } else if (arc.source?.place) {
+                transition.delta[place.offset] = 0 - arc.weight;
+            } else {
+                throw new Error("invalid arc");
+            }
+        } else { // was not inhibitor
+            if (arc.target?.place) {
+                transition.delta[place.offset] = arc.weight;
+            } else if (arc.source?.place) {
+                transition.delta[place.offset] = 0 - arc.weight;
+            } else {
+                throw new Error("invalid arc");
+            }
+        }
+        return true;
+    }
+
+    function loadDeclarationObject(obj: ModelDeclaration) {
+        if (obj.version !== version) {
+            throw new Error("invalid model version: " + obj.version);
+        }
+        const nodes = new Map<string, PlaceNode | TxNode>();
+        for (const label in obj.places) {
+            const {initial, capacity, x, y} = obj.places[label];
+            nodes.set(label, cell(label, initial, capacity, {x, y}));
+        }
+        for (const label in obj.transitions) {
+            const {x, y} = obj.transitions[label];
+            nodes.set(label, fn(label, {label: "default"}, {x, y}));
+        }
+        for (const arc of obj.arcs) {
+            const {source, target, weight, inhibit, reentry} = arc;
+            const sourceObj = nodes.get(source);
+            const targetObj = nodes.get(target);
+            if (!sourceObj) {
+                throw new Error("invalid arc source: "+source);
+            }
+            if (!targetObj) {
+                throw new Error("invalid arc target: "+target);
+            }
+            if (sourceObj.nodeType === "place") {
+                if (targetObj.nodeType !== "transition") {
+                    throw new Error("invalid arc target: "+target);
+                }
+                if (inhibit) {
+                    sourceObj.guard(weight, targetObj);
+                } else  {
+                    sourceObj.tx(weight, targetObj);
+                }
+                if (reentry) {
+                    throw new Error("reentry must use transition->place arc");
+                }
+            } else if (sourceObj.nodeType === "transition") {
+                if (targetObj.nodeType !== "place") {
+                    throw new Error("invalid arc");
+                }
+                if (inhibit) {
+                    sourceObj.guard(weight, targetObj);
+                } else  {
+                    sourceObj.tx(weight, targetObj);
+                }
+                if (reentry) {
+                    sourceObj.reentry(targetObj);
+                }
+            }
+        }
+
     }
 
     if (declaration) {
-        declaration(fn, cell, role);
-        if (!index()) {
+        if (typeof declaration === "function") {
+            declaration(fn, cell, role);
+        } else {
+            loadDeclarationObject(declaration);
+        }
+        if (!indexArcs()) {
             throw new Error("invalid declaration");
         }
     }
 
     return {
-        dsl: {fn, cell, role},
-        def,
-        index,
-        guardFails,
-        emptyVector,
-        initialVector,
+        addPlace,
+        addTransition,
         capacityVector,
-        testFire,
+        def,
+        deleteArc,
+        deletePlace,
+        deleteTransition,
+        dsl: {fn, cell, role},
+        emptyVector,
         fire,
+        getObject,
+        getPlace,
+        getSize,
+        guardFails,
+        indexArcs,
+        initialVector,
+        newLabel,
+        objectExists,
         pushState,
-        getSize
+        rebuildArcs,
+        renamePlace,
+        renameTransition,
+        setArcWeight,
+        testFire,
+        toObject,
+        toggleInhibitor,
+        transitionSeq,
     };
 }

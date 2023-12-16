@@ -28,7 +28,6 @@ type EventLog<TEvent> = {
     ts: number; // micro
 }
 
-
 export class Stream<TEvent extends Event> {
     readonly dispatcher: Dispatcher<TEvent>;
     public state: Map<string, Vector> = new Map<string, Vector>();
@@ -82,7 +81,12 @@ export class Stream<TEvent extends Event> {
             on: (action: string, handler: Handler<TEvent>) => eventHandlers.set(action, handler),
             off: (action: string) => eventHandlers.delete(action),
             onFail: (handler: Handler<TEvent>) => eventHandlers.set("__onFail__", handler),
-            fail: (s: Stream<TEvent>, evt: TEvent) => eventHandlers.get("__onFail__")(s, evt),
+            fail: (s: Stream<TEvent>, evt: TEvent) => {
+                const callback = eventHandlers.get("__onFail__");
+                if (callback) {
+                    callback(s, evt);
+                }
+            }
         };
     }
 

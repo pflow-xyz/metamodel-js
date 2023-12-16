@@ -1,9 +1,10 @@
 import {expect} from "chai";
 import {inhibitTest} from "./examples";
-import {Declaration, ModelType, newModel} from "../";
+import {DeclarationFunction, ModelType, newModel} from "../";
+import {reverseInhibitTest} from "./examples/inhibitTest";
 
 
-function testModel({declaration, type}: { declaration: Declaration; type: ModelType }) {
+function testModel({declaration, type}: { declaration: DeclarationFunction; type: ModelType }) {
     const m = newModel({
         schema: "testInhibitor",
         declaration,
@@ -12,12 +13,12 @@ function testModel({declaration, type}: { declaration: Declaration; type: ModelT
     const state = m.initialVector();
     const trigger = (action: string, opts?: { expectPass?: boolean; expectFail?: boolean }) => {
         m.fire(state, action, 1,
-            () => expect(opts?.expectPass).to.be.true,
-            () => expect(opts?.expectFail).to.be.true,
+            () => expect(!!opts?.expectPass).to.be.true,
+            () => expect(!!opts?.expectFail).to.be.true,
         );
         console.log({state, action}, "after");
     };
-    return {state, trigger};
+    return {state, trigger, m};
 }
 
 describe("inhibitTest", () => {
@@ -30,3 +31,17 @@ describe("inhibitTest", () => {
     });
 });
 
+describe("reverse inhibitTest", () => {
+    it("should inhibit bar", () => {
+        const {state, trigger} = testModel({declaration: reverseInhibitTest, type: ModelType.petriNet});
+        //console.log(JSON.stringify(m.toObject("sparse"), null, 2));
+        trigger("baz", {expectFail: true});
+        trigger("bar", {expectPass: true});
+        trigger("baz", {expectFail: true});
+        expect(state[0]).to.equal(2);
+        trigger("bar", {expectPass: true});
+        trigger("baz", {expectPass: true});
+        expect(state[0]).to.equal(3);
+        trigger("baz", {expectPass: true});
+    });
+});

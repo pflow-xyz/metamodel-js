@@ -126,16 +126,25 @@ export function snapshot(model: Model, options?: { state?: Vector; hashChar?: Ha
     transitions.forEach((t) => {
         t.guards.forEach((v, k) => {
             const place = places.get(k);
-            const pts = getArcPoints({source: place, target: t});
-            arcTags += arcTemplate({
-                ...pts,
-                stroke: "black",
-                markerEnd: `url(${hashChar}markerInhibit1)`,
-                weight: Math.abs(v.delta[place.offset])
-            });
+            if (v.inverted) {
+                const pts = getArcPoints({source: t, target: place});
+                arcTags += arcTemplate({
+                    ...pts,
+                    stroke: "black",
+                    markerEnd: `url(${hashChar}markerInhibit1)`,
+                    weight: Math.abs(v.delta[place.offset])
+                });
+            }  else {
+                const pts = getArcPoints({source: place, target: t});
+                arcTags += arcTemplate({
+                    ...pts,
+                    stroke: "black",
+                    markerEnd: `url(${hashChar}markerInhibit1)`,
+                    weight: Math.abs(v.delta[place.offset])
+                });
+            }
         });
     });
-    // TODO: support snapshot while running
     transitions.forEach((t) => {
         for (const i in t.delta) {
             const v = t.delta[i];

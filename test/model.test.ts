@@ -1,6 +1,7 @@
 import {expect} from "chai";
 import {tictactoe} from "./examples";
-import {Cell, Declaration, Fn, ModelType, newModel, PlaceNode, Role, TxNode} from "../";
+import {Cell, DeclarationFunction, Fn, ModelType, newModel, PlaceNode, Role, snapshot, TxNode} from "../";
+import * as fs from "fs";
 
 function testElementaryValid(fn: Fn, cell: Cell, role: Role): {
     p1: PlaceNode;
@@ -13,7 +14,7 @@ function testElementaryValid(fn: Fn, cell: Cell, role: Role): {
     const p1 = cell("p0", 1, 1, {x: 100, y: 100});
     const t1 = fn("t1", r, {x: 200, y: 100});
     const p2 = cell("p2", 0, 1, {x: 300, y: 100});
-    const p3 = cell("p3", 0, 1, {x: 400, y: 100});
+    const p3 = cell("p3", 0, 1, {x: 300, y: 200});
 
     p1.tx(1, t1);
     t1.tx(1, p2);
@@ -37,8 +38,7 @@ function testWorkflowValid(fn: Fn, cell: Cell, role: Role): void {
     p2.tx(1, t1);
 }
 
-
-function testModel({declaration, type}: { declaration: Declaration; type: ModelType }) {
+function testModel({declaration, type}: {declaration: DeclarationFunction; type: ModelType }) {
     const m = newModel({
         schema: "testElementary",
         declaration,
@@ -47,11 +47,11 @@ function testModel({declaration, type}: { declaration: Declaration; type: ModelT
     const state = m.initialVector();
     const trigger = (action: string, opts?: { expectPass?: boolean; expectFail?: boolean }) => {
         m.fire(state, action, 1,
-            () => expect(opts?.expectPass).to.be.true,
-            () => expect(opts?.expectFail).to.be.true,
+            () => expect(!!opts?.expectPass).to.be.true,
+            () => expect(!!opts?.expectFail).to.be.true,
         );
     };
-    return {state, trigger};
+    return {m, state, trigger};
 }
 
 describe("metamodel", () => {
@@ -71,9 +71,12 @@ describe("metamodel", () => {
         });
 
         it("should still work for invalid elementary models", () => {
-            const {trigger} = testModel({declaration: testElementaryInvalid, type: ModelType.petriNet});
-            trigger("t1", {expectPass: true});
-            trigger("t1", {expectFail: true});
+            const mm = testModel({declaration: testElementaryInvalid, type: ModelType.petriNet});
+            const svg = snapshot(mm.m, {});
+            fs.writeFileSync("test.svg", svg);
+
+            mm.trigger("t1", {expectPass: true});
+            mm.trigger("t1", {expectFail: true});
         });
 
     });

@@ -1,6 +1,6 @@
 ## @pflow-dev/metamodel
 
-STATUS: alpha build
+STATUS: beta
 
 Create state-machines using [Petri-Nets](http://www.scholarpedia.org/article/Petri_net) in Javascript/Typescript.
 
