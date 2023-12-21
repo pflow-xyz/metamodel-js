@@ -130,12 +130,10 @@ export interface Model {
     getPlace: (label: string | number) => Place;
     getSize: () => { width: number; height: number };
     guardFails: (state: Vector, action: string, multiple: number) => boolean;
-    indexArcs: () => void;
     initialVector: () => Vector;
     newLabel: (label: string, suffix?: number) => string;
     objectExists: (id: string) => boolean;
     pushState: (state: Vector, action: string, multiple: number) => Result;
-    rebuildArcs: () => void;
     renamePlace: (oldLabel: string, newLabel: string) => void;
     renameTransition: (oldLabel: string, newLabel: string) => void;
     setArcWeight: (offset: number, weight: number) => boolean;
@@ -369,66 +367,6 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
         });
         return ok;
-    }
-
-    /**
-     * Rebuild arcs from vector index
-     */
-    function rebuildArcs() {
-        def.arcs = [];
-        // TODO: does this really work add a test for this
-
-        const offsetToPlace = new Map<number, Place>();
-        def.places.forEach((p) => {
-            offsetToPlace.set(p.offset, p);
-        });
-
-        def.transitions.forEach((t) => {
-            t.delta.forEach((i, d) => {
-                if (d < 0) {
-                    def.arcs.push({
-                        metaType: "arc",
-                        offset: def.arcs.length,
-                        source: {place: offsetToPlace.get(i)},
-                        target: {transition: t},
-                        weight: 0 - d,
-                    });
-                } else if (d > 0) { //
-                    def.arcs.push({
-                        metaType: "arc",
-                        offset: def.arcs.length,
-                        source: {transition: t},
-                        target: {place: offsetToPlace.get(i)},
-                        weight: d,
-                    });
-                }
-            });
-
-            t.guards.forEach((g) => {
-                g.delta.forEach((i, d) => {
-                    if (g.inverted) {
-                        def.arcs.push({
-                            metaType: "arc",
-                            offset: def.arcs.length,
-                            source: {transition: t},
-                            target: {place: offsetToPlace.get(i)},
-                            weight: 0 - d,
-                            inhibit: true,
-                            inverted: true,
-                        });
-                    } else {
-                        def.arcs.push({
-                            metaType: "arc",
-                            offset: def.arcs.length,
-                            source: {place: offsetToPlace.get(i)},
-                            target: {transition: t},
-                            weight: 0 - d,
-                            inhibit: true,
-                        });
-                    }
-                });
-            });
-        });
     }
 
     function vectorAdd(state: Vector, delta: Vector, multiple: number): {
@@ -1044,12 +982,10 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         getPlace,
         getSize,
         guardFails,
-        indexArcs,
         initialVector,
         newLabel,
         objectExists,
         pushState,
-        rebuildArcs,
         renamePlace,
         renameTransition,
         setArcWeight,
