@@ -883,16 +883,14 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         if (!place || !transition) {
             throw new Error("invalid arc");
         }
-        if (arc.inhibit) { // was inhibitor
-            transition.guards.delete(place.label);
-            if (arc.target?.place) {
-                transition.delta[place.offset] = arc.weight;
-            } else if (arc.source?.place) {
-                transition.delta[place.offset] = 0 - arc.weight;
+        if (arc.inhibit) {
+            const g = transition.guards.get(place.label);
+            if (g) {
+                g.delta[place.offset] = 0 - arc.weight;
             } else {
                 throw new Error("invalid arc");
             }
-        } else { // was not inhibitor
+        } else {
             if (arc.target?.place) {
                 transition.delta[place.offset] = arc.weight;
             } else if (arc.source?.place) {
