@@ -1,6 +1,5 @@
 import {expect} from "chai";
-import {inhibitTest} from "./examples";
-import {DeclarationFunction, ModelType, newModel, Cell, Fn, Role} from "../";
+import {DeclarationFunction, ModelType, newModel, Dsl} from "../";
 
 
 function testModel({declaration, type}: { declaration: DeclarationFunction; type: ModelType }) {
@@ -24,7 +23,7 @@ export function pos(x: number, y: number): { x: number; y: number } {
     return {x: x * 80, y: y * 80};
 }
 
-export function declaration(fn: Fn, cell: Cell, role: Role): void {
+export function declaration({fn, cell, role}: Dsl): void {
     const defaultRole = role("default");
     const foo = cell("foo", 1, 0, pos(6, 2));
     const bar = fn("bar", defaultRole, pos(5, 4));

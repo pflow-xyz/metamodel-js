@@ -4,7 +4,7 @@ export function pos(x: number, y: number): { x: number; y: number } {
     return {x: x * 80, y: y * 80};
 }
 
-export function inhibitTest(fn: mm.Fn, cell: mm.Cell, role: mm.Role): void {
+export function inhibitTest({fn, cell, role}: mm.Dsl): void {
     const defaultRole = role("default");
     const foo = cell("foo", 1, 0, pos(6, 2));
     const bar = fn("bar", defaultRole, pos(5, 4));
@@ -13,7 +13,7 @@ export function inhibitTest(fn: mm.Fn, cell: mm.Cell, role: mm.Role): void {
     foo.tx(1, bar);
 }
 
-export function reverseInhibitTest(fn: mm.Fn, cell: mm.Cell, role: mm.Role): void {
+export function reverseInhibitTest({fn, cell, role}: mm.Dsl): void {
     const defaultRole = role("default");
     const foo = cell("foo", 1, 0, pos(6, 2));
     const bar = fn("bar", defaultRole, pos(5, 4));

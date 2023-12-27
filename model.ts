@@ -12,11 +12,11 @@ export interface Position {
     y: number;
     z?: number;
 }
-
+export type Dsl = { fn: Fn; cell: Cell; role: Role };
 export type Fn = (label: string, role: RoleDef, position: Position) => TxNode
 export type Cell = (label: string, initial: number, capacity: number, position: Position) => PlaceNode
 export type Role = (label: string) => RoleDef
-export type DeclarationFunction = (fn: Fn, cell: Cell, role: Role) => void
+export type DeclarationFunction = ({fn, cell, role}: Dsl) => void
 export type Vector = number[];
 export type MetaType = "place" | "transition" | "arc";
 
@@ -956,7 +956,7 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
 
     if (declaration) {
         if (typeof declaration === "function") {
-            declaration(fn, cell, role);
+            declaration({fn, cell, role});
         } else {
             loadDeclarationObject(declaration);
         }

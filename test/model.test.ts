@@ -1,9 +1,9 @@
 import {expect} from "chai";
 import {tictactoe} from "./examples";
-import {Cell, DeclarationFunction, Fn, ModelType, newModel, PlaceNode, Role, snapshot, TxNode} from "../";
+import {Dsl, DeclarationFunction, ModelType, newModel, PlaceNode, snapshot, TxNode} from "../";
 import * as fs from "fs";
 
-function testElementaryValid(fn: Fn, cell: Cell, role: Role): {
+function testElementaryValid({fn, cell, role}: Dsl): {
     p1: PlaceNode;
     p2: PlaceNode;
     p3: PlaceNode;
@@ -21,12 +21,12 @@ function testElementaryValid(fn: Fn, cell: Cell, role: Role): {
     return {p1, t1, p2, p3};
 }
 
-function testElementaryInvalid(fn: Fn, cell: Cell, role: Role): void {
-    const base = testElementaryValid(fn, cell, role);
+function testElementaryInvalid({fn, cell, role}: Dsl): void {
+    const base = testElementaryValid({fn, cell, role});
     base.t1.tx(1, base.p3); // add an extra output making this invalid
 }
 
-function testWorkflowValid(fn: Fn, cell: Cell, role: Role): void {
+function testWorkflowValid({fn, cell, role}: Dsl): void {
     const r = role("default");
     const p1 = cell("p1", 1, 1, {x: 100, y: 100});
     const p2 = cell("p2", 0, 1, {x: 300, y: 100});

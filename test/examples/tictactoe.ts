@@ -1,11 +1,11 @@
-import {Cell, Fn, PlaceNode, Role, RoleDef} from "../../model";
+import {Dsl, PlaceNode, RoleDef} from "../../model";
 
 
 // visual spacing
 const dx = 220;
 const dy = 140;
 
-export function tictactoe(fn: Fn, cell: Cell, role: Role): void {
+export function tictactoe({fn, cell, role}: Dsl): void {
 
     function row(n: number) {
         const y = (n + 1) * dy;
