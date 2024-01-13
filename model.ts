@@ -120,10 +120,10 @@ export interface Model {
     addTransition: (coords: { x: number; y: number }) => boolean;
     capacityVector: () => Vector;
     def: PetriNet;
+    swapArc: (id: number) => void;
     deleteArc: (id: number) => void;
     deletePlace: (id: string) => void;
     deleteTransition: (id: string) => void;
-    dsl: { fn: Fn; cell: Cell; role: Role };
     emptyVector: () => Vector;
     fire: (state: Vector, action: string, multiple: number, resolve?: (res: Result) => void, reject?: (res: Result) => void) => Result;
     getObject: (id: string) => Place | Transition;
@@ -137,7 +137,6 @@ export interface Model {
     renamePlace: (oldLabel: string, newLabel: string) => void;
     renameTransition: (oldLabel: string, newLabel: string) => void;
     setArcWeight: (offset: number, weight: number) => boolean;
-    testFire: (state: Vector, action: string, multiple: number) => Result;
     toObject: (mode?: "sparse" | "full") => any;
     toggleInhibitor: (id: number) => boolean;
     transitionSeq: () => string;
@@ -147,7 +146,7 @@ export type ModelDeclaration = {
     modelType: ModelType;
     version: Version;
     places: {
-        [key: string]: { initial?: number; capacity?: number; x: number; y: number  };
+        [key: string]: { offset: number; initial?: number; capacity?: number; x: number; y: number  };
     };
     transitions: {
         [key: string]: { role?: string; x: number; y: number };
@@ -628,6 +627,30 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             return a.source?.place?.label !== id && a.target?.place?.label !== id;
         });
     }
+
+    function swapArc(id: number): void {
+        const arc = def.arcs[id];
+        const place = arc.source?.place || arc.target?.place;
+        const transition = arc.source?.transition || arc.target?.transition;
+
+        if (arc.inhibit) {
+            const g = transition.guards.get(place.label);
+            if (g) {
+                g.inverted = !g.inverted;
+            }
+        } else {
+            transition.delta[place.offset] = 0-transition.delta[place.offset];
+        }
+
+        if (arc.source?.place) {
+            arc.source = { transition };
+            arc.target = { place };
+        } else {
+            arc.source = { place };
+            arc.target = { transition };
+        }
+    }
+
     function deleteArc(id: number): void {
         const arc = def.arcs[id];
         const source = arc.source?.place || arc.source?.transition;
@@ -907,13 +930,24 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
             throw new Error("invalid model version: " + obj.version);
         }
         const nodes = new Map<string, PlaceNode | TxNode>();
+        const placeList = [];
         for (const label in obj.places) {
-            const {initial, capacity, x, y} = obj.places[label];
+            const {
+                initial,
+                offset,
+                capacity,
+                x,
+                y
+            } = obj.places[label];
+            placeList.push({label, offset, initial: initial || 0, capacity: capacity || 0, x, y});
+        }
+        placeList.sort((a, b) => a.offset - b.offset);
+        for (const {label, initial, capacity, x, y} of placeList) {
             nodes.set(label, cell(label, initial, capacity, {x, y}));
         }
         for (const label in obj.transitions) {
-            const {x, y} = obj.transitions[label];
-            nodes.set(label, fn(label, {label: "default"}, {x, y}));
+            const {x, y, role} = obj.transitions[label];
+            nodes.set(label, fn(label, {label: role || "default"}, {x, y}));
         }
         for (const arc of obj.arcs) {
             const {source, target, weight, inhibit, reentry} = arc;
@@ -930,9 +964,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                     throw new Error("invalid arc target: "+target);
                 }
                 if (inhibit) {
-                    sourceObj.guard(weight, targetObj);
+                    sourceObj.guard(weight || 1, targetObj);
                 } else  {
-                    sourceObj.tx(weight, targetObj);
+                    sourceObj.tx(weight || 1, targetObj);
                 }
                 if (reentry) {
                     throw new Error("reentry must use transition->place arc");
@@ -942,9 +976,9 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
                     throw new Error("invalid arc");
                 }
                 if (inhibit) {
-                    sourceObj.guard(weight, targetObj);
+                    sourceObj.guard(weight || 1, targetObj);
                 } else  {
-                    sourceObj.tx(weight, targetObj);
+                    sourceObj.tx(weight || 1, targetObj);
                 }
                 if (reentry) {
                     sourceObj.reentry(targetObj);
@@ -970,10 +1004,10 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         addTransition,
         capacityVector,
         def,
+        swapArc,
         deleteArc,
         deletePlace,
         deleteTransition,
-        dsl: {fn, cell, role},
         emptyVector,
         fire,
         getObject,
@@ -987,7 +1021,6 @@ export function newModel({schema, declaration, type}: ModelOptions): Model {
         renamePlace,
         renameTransition,
         setArcWeight,
-        testFire,
         toObject,
         toggleInhibitor,
         transitionSeq,

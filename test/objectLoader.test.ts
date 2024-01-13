@@ -22,7 +22,7 @@ const inhibitTest: ModelDeclaration = {
     modelType: ModelType.petriNet,
     version: "v0",
     places: {
-        foo: {x: 0, y: 0},
+        foo: {offset: 0, x: 0, y: 0},
     },
     transitions: {
         bar: {x: 0, y: 0},

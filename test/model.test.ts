@@ -72,8 +72,7 @@ describe("metamodel", () => {
 
         it("should still work for invalid elementary models", () => {
             const mm = testModel({declaration: testElementaryInvalid, type: ModelType.petriNet});
-            const svg = snapshot(mm.m, {});
-            fs.writeFileSync("test.svg", svg);
+
 
             mm.trigger("t1", {expectPass: true});
             mm.trigger("t1", {expectFail: true});
