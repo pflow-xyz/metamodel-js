@@ -98,7 +98,6 @@ export enum ModelType {
 }
 
 export interface PetriNet {
-    schema: string;
     roles: Map<string, RoleDef>;
     places: Map<string, Place>;
     transitions: Map<string, Transition>;
@@ -161,16 +160,14 @@ export type ModelDeclaration = {
 };
 
 export interface ModelOptions {
-    schema: string;
     declaration?: DeclarationFunction | ModelDeclaration;
     type?: ModelType;
 }
 
-export function newModel({schema, declaration, type}: ModelOptions): Model {
+export function newModel({declaration, type}: ModelOptions): Model {
     const arcs = Array<Arc>();
 
     const def = {
-        schema,
         roles: new Map<string, RoleDef>(),
         places: new Map<string, Place>(),
         transitions: new Map<string, Transition>(),

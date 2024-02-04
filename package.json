@@ -1,14 +1,15 @@
 {
   "name": "@pflow-dev/metamodel",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "main": "/index.js",
   "types": "/index.d.ts",
-  "description": "create workflows and petriNets with a DSL",
+  "description": "Create wf-nets and Petri-nets with js, ts, or json",
   "files": [
     "index.ts",
     "model.ts",
     "snapshot.ts",
     "stream.ts",
+    "zip.ts",
     "model.js.map",
     "model.js",
     "model.d.ts",
@@ -20,7 +21,10 @@
     "stream.d.ts",
     "index.js.map",
     "index.js",
-    "index.d.ts"
+    "index.d.ts",
+    "zip.js.map",
+    "zip.js",
+    "zip.d.ts"
   ],
   "repository": {
     "type": "git",
@@ -52,5 +56,8 @@
     "jest": "^26.1.0",
     "ts-jest": "^26.1.1",
     "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
   }
 }

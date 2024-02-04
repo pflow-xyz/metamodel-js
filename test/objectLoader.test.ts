@@ -1,9 +1,9 @@
 import {expect} from "chai";
 import {ModelDeclaration, ModelType, newModel} from "../";
 
+
 function testModel({declaration, type}: { declaration: ModelDeclaration; type: ModelType }) {
     const m = newModel({
-        schema: "testInhibitor",
         declaration,
         type,
     });

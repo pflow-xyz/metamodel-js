@@ -29,7 +29,7 @@ const wfNet: ModelDeclaration = {
 describe("metamodel", () => {
     describe("workflow", () => {
         it("should not work for invalid models", () => {
-          const m = newModel({schema: "wfNet", declaration: wfNet, type: wfNet["modelType"]});
+          const m = newModel({declaration: wfNet, type: wfNet["modelType"]});
           expect(m.def.type).toEqual("workflow");
           const svg = snapshot(m, { state: [0, 0, 1, 0]});
           fs.writeFileSync("test.svg", svg); // FIXME: assert this generates a valid SVG

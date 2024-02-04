@@ -4,7 +4,6 @@ import {DeclarationFunction, ModelType, newModel, Dsl} from "../";
 
 function testModel({declaration, type}: { declaration: DeclarationFunction; type: ModelType }) {
     const m = newModel({
-        schema: "testInhibitor",
         declaration,
         type,
     });

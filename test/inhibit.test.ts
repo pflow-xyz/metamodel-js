@@ -6,7 +6,6 @@ import {reverseInhibitTest} from "./examples/inhibitTest";
 
 function testModel({declaration, type}: { declaration: DeclarationFunction; type: ModelType }) {
     const m = newModel({
-        schema: "testInhibitor",
         declaration,
         type,
     });

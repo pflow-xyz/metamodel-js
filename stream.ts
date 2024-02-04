@@ -13,11 +13,10 @@ export type Dispatcher<TEvent extends Event> = {
 }
 
 type StreamArgs<TEvent extends Event> = {
-    models: Model[];
+    model: Model;
 }
 
 type Event = {
-    schema: string;
     action: string;
     multiple: number;
 }
@@ -30,31 +29,25 @@ type EventLog<TEvent> = {
 
 export class Stream<TEvent extends Event> {
     readonly dispatcher: Dispatcher<TEvent>;
-    public state: Map<string, Vector> = new Map<string, Vector>();
-    public models: Map<string, Model> = new Map<string, Model>();
+    public state: Vector;
+    public model: Model;
     public history: Array<EventLog<TEvent>> = [];
     private seq = 0;
 
-    constructor({models}: StreamArgs<TEvent>) {
+    constructor({model}: StreamArgs<TEvent>) {
         this.seq = 0;
         this.history = [];
-        models.forEach((model) => {
-            this.models.set(model.def.schema, model);
-        });
+        this.model = model;
         this.dispatcher = this.newDispatcher();
         this.dispatch = this.dispatch.bind(this);
     }
 
     dispatch(evt: TEvent): Result {
-        const model: Model = this.models.get(evt.schema);
-        if (!model) {
-            throw new Error(`model not found: ${evt.schema}`);
-        }
-        const state: Vector = this.state.get(evt.schema) || model.initialVector();
+        const state: Vector = this.state || this.model.initialVector();
 
-        return model.fire(state, evt.action, evt.multiple,
+        return this.model.fire(state, evt.action, evt.multiple,
             ({out, role}) => {
-                this.state.set(evt.schema, out);
+                this.state = out;
                 this.history.push({seq: this.seq++, event: evt, ts: Date.now()});
                 const callback = this.dispatcher.getHandler(evt.action);
                 if (callback) {
@@ -69,9 +62,7 @@ export class Stream<TEvent extends Event> {
     restart() {
         this.seq = 0;
         this.history = [];
-        this.models.forEach((model) => {
-            this.state.delete(model.def.schema);
-        });
+        this.state = this.model.initialVector();
     }
 
     private newDispatcher(): Dispatcher<TEvent> {

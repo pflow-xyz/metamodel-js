@@ -40,7 +40,6 @@ function testWorkflowValid({fn, cell, role}: Dsl): void {
 
 function testModel({declaration, type}: {declaration: DeclarationFunction; type: ModelType }) {
     const m = newModel({
-        schema: "testElementary",
         declaration,
         type,
     });
@@ -57,7 +56,7 @@ function testModel({declaration, type}: {declaration: DeclarationFunction; type:
 describe("metamodel", () => {
     describe("petriNet", () => {
         it("should be able to play tic-tac-toe", () => {
-            const m = newModel({schema: "game", declaration: tictactoe});
+            const m = newModel({declaration: tictactoe});
             expect(m.def.type).to.equal("petriNet");
             const state = m.initialVector();
             expect(m.emptyVector()).to.deep.equal([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
