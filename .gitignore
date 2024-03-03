@@ -41,6 +41,6 @@ stream.d.ts
 stream.js
 stream.js.map
 test.svg
-zip.d.ts
-zip.js
-zip.js.map
+compression.d.ts
+compression.js
+compression.js.map

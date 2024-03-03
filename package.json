@@ -1,15 +1,15 @@
 {
   "name": "@pflow-dev/metamodel",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "main": "/index.js",
   "types": "/index.d.ts",
-  "description": "Create wf-nets and Petri-nets with js, ts, or json",
+  "description": "Create Petri-nets with js, ts, or json",
   "files": [
     "index.ts",
     "model.ts",
     "snapshot.ts",
     "stream.ts",
-    "zip.ts",
+    "compression.ts",
     "model.js.map",
     "model.js",
     "model.d.ts",
@@ -22,9 +22,9 @@
     "index.js.map",
     "index.js",
     "index.d.ts",
-    "zip.js.map",
-    "zip.js",
-    "zip.d.ts"
+    "compression.js.map",
+    "compression.js",
+    "compression.d.ts"
   ],
   "repository": {
     "type": "git",
@@ -58,6 +58,6 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "jszip": "^3.10.1"
+    "brotli-wasm": "^2.0.1"
   }
 }
